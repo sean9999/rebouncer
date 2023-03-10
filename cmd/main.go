@@ -4,7 +4,7 @@ import (
 	"flag"
 	"log"
 
-	rebouncer "github.com/sean9999/rebouncer/pkg"
+	"github.com/sean9999/rebouncer"
 )
 
 var (
