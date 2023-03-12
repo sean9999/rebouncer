@@ -20,7 +20,7 @@ func init() {
 
 func main() {
 
-	niceEvents := make(chan rebouncer.NiceEvent)
+	niceEvents := make(chan rebouncer.NiceEvent, rebouncer.BUFFER_LENGTH)
 
 	//	start watcher
 	if err := rebouncer.WatchRecursively(*watchDir, niceEvents); err != nil {
@@ -37,7 +37,7 @@ func main() {
 	*/
 
 	for e := range niceEvents {
-		log.Printf("%s - %s", e.Event, e.File)
+		log.Printf("MAIN NICEEVENT: %s - %s", e.Event, e.File)
 	}
 
 }

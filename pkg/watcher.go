@@ -1,55 +1,61 @@
 package pkg
 
 import (
+	"fmt"
 	"path/filepath"
 	"strings"
 
 	"github.com/rjeczalik/notify"
 )
 
+const BUFFER_LENGTH = 1024
+
 type NiceEvent struct {
-	Event string
+	Tag   string
 	File  string
+	Event string
 }
 
-func NotifyEventInfoToNiceEvent(ei notify.EventInfo, path string) NiceEvent {
+func NotifyEventInfoToNiceEvent(ei notify.EventInfo, path string, niceChannel chan NiceEvent) {
 	abs, _ := filepath.Abs(path)
-	return NiceEvent{
+	n := NiceEvent{
+		Tag:   "EventInfo_to_Nice",
 		File:  strings.TrimPrefix(ei.Path(), abs+"/"),
 		Event: ei.Event().String(),
 	}
+	niceChannel <- n
 }
 
-/*
-func niceEventToBuffer(ne NiceEvent) (bytes.Buffer, error) {
-	var buf bytes.Buffer
-	enc := json.NewEncoder(&buf)
-	err := enc.Encode(ne)
-	return buf, err
+func NiceEventToRebounceEvent(e NiceEvent, rbChannel chan NiceEvent) {
+	e.Tag = "Nice_to_rebounce"
+	rbChannel <- e
 }
-
-func toBytes(ei notify.EventInfo) []byte {
-	ne := notifyEventInfoToNiceEvent(ei)
-	buf, _ := niceEventToBuffer(ne)
-	b := buf.Bytes()
-	return b
-}
-*/
 
 // WatchRecursively emits event info to the "niceEvents" channel
 func WatchRecursively(path string, niceEvents chan NiceEvent) error {
 
-	var c = make(chan notify.EventInfo)
-	err := notify.Watch(path+"/...", c, notify.All)
+	var fsEvents = make(chan notify.EventInfo, BUFFER_LENGTH)
+	err := notify.Watch(path+"/...", fsEvents, notify.All)
 
-	//	massage the event to the format we want
-	go func() {
-		for eventInfo := range c {
-			niceEvent := NotifyEventInfoToNiceEvent(eventInfo, path)
-			//log.Printf("%s - %s", niceEvent.Event, niceEvent.File)
-			niceEvents <- niceEvent
-		}
-	}()
+	rebouncedEvents := make(chan NiceEvent, BUFFER_LENGTH)
+
+	if err == nil {
+
+		go func() {
+			for {
+				select {
+				case niceEvent := <-niceEvents:
+					fmt.Println("niceEvent", niceEvent)
+					NiceEventToRebounceEvent(niceEvent, rebouncedEvents)
+				case rb := <-rebouncedEvents:
+					fmt.Println("rb", rb)
+				case fsEvent := <-fsEvents:
+					fmt.Println("fsEvent", fsEvent)
+					NotifyEventInfoToNiceEvent(fsEvent, path, niceEvents)
+				}
+			}
+		}()
+	}
 
 	return err
 }
