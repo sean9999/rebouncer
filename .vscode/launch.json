@@ -2,11 +2,12 @@
     "version": "0.2.0",
     "configurations": [
         {
-            "name": "Go run",
+            "name": "run watching ./tmp",
             "type": "go",
             "request": "launch",
             "mode": "auto",
-            "program": "${workspaceFolder}/main.go"
+            "program": "${workspaceFolder}/cmd/main.go",
+            "args": ["--dir", "${workspaceFolder}/tmp"]
         }
     ]
 }
