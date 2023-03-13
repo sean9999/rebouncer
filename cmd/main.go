@@ -2,6 +2,7 @@ package main
 
 import (
 	"flag"
+	"fmt"
 	"log"
 
 	"github.com/sean9999/rebouncer"
@@ -25,7 +26,7 @@ func main() {
 	}
 
 	for e := range niceEvents {
-		log.Printf("Rebouncer: %s - %s", e.Event, e.File)
+		fmt.Println(e.Dump())
 	}
 
 }

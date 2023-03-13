@@ -1,30 +1,47 @@
 package rebouncer
 
 import (
+	"fmt"
 	"path/filepath"
 	"strings"
 
 	"github.com/rjeczalik/notify"
+	"golang.org/x/sys/unix"
 )
 
+const WatchMask = notify.InModify | notify.InCloseWrite |
+	notify.InMovedFrom | notify.InMovedTo | notify.InCreate |
+	notify.InDelete | notify.InDeleteSelf | notify.InMoveSelf
+
 type NiceEvent struct {
-	Tag   string
-	File  string
-	Event string
+	Type   string
+	File   string
+	Event  string
+	Cookie uint32
+	Data   *unix.InotifyEvent
+}
+
+func (e NiceEvent) Dump() string {
+	return fmt.Sprintf("%s:\t%s\t%+v (cookie=%x)", e.Event, e.File, e.Data, e.Cookie)
 }
 
 func NotifyEventInfoToNiceEvent(ei notify.EventInfo, path string, niceChannel chan NiceEvent) {
 	abs, _ := filepath.Abs(path)
+
+	data := ei.Sys().(*unix.InotifyEvent)
+
 	n := NiceEvent{
-		Tag:   "EventInfo_to_Nice",
-		File:  strings.TrimPrefix(ei.Path(), abs+"/"),
-		Event: ei.Event().String(),
+		Type:   "fs/inotify",
+		File:   strings.TrimPrefix(ei.Path(), abs+"/"),
+		Event:  ei.Event().String(),
+		Cookie: data.Cookie,
+		Data:   ei.Sys().(*unix.InotifyEvent),
 	}
 	niceChannel <- n
 }
 
 func NiceEventToRebounceEvent(e NiceEvent, rbChannel chan NiceEvent) {
-	e.Tag = "Nice_to_rebounce"
+	e.Type = "Nice_to_rebounce"
 	rbChannel <- e
 }
 
@@ -63,32 +80,10 @@ func WatchDirectory(path string, niceEvents chan NiceEvent) error {
 	var fsEvents = make(chan notify.EventInfo, BufferLength)
 	err := notify.Watch(path+"/...", fsEvents, notify.All)
 
-	var batchedEvents []NiceEvent
-
 	if err == nil {
 		go func() {
-			for {
-				select {
-				case niceEvent := <-niceEvents:
-					//fmt.Println("niceEvent", niceEvent)
-					//NiceEventToRebounceEvent(niceEvent, rebouncedEvents)
-					batchedEvents = append(batchedEvents, niceEvent)
-				case fsEvent := <-fsEvents:
-					//fmt.Println("fsEvent", fsEvent)
-					NotifyEventInfoToNiceEvent(fsEvent, path, niceEvents)
-					/*
-						case <-time.After(3 * time.Second):
-							if len(batchedEvents) > 0 {
-								normalizedEvents := batchedEvents
-								fmt.Println("batch")
-								for _, e := range normalizedEvents {
-									niceEvents <- e
-								}
-								batchedEvents = nil
-							}
-					*/
-				}
-
+			for fsEvent := range fsEvents {
+				NotifyEventInfoToNiceEvent(fsEvent, path, niceEvents)
 			}
 		}()
 	}
