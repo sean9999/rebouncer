@@ -11,3 +11,5 @@ require (
 	github.com/denisbrodbeck/machineid v1.0.1
 	golang.org/x/sys v0.6.0
 )
+
+require github.com/mustafaturan/bus/v3 v3.0.3 // indirect

@@ -18,34 +18,14 @@ func NotifyEventInfoToNiceEvent(ei notify.EventInfo, path string, niceChannel ch
 	data := ei.Sys().(*unix.InotifyEvent)
 
 	n := NiceEvent{
-		Type:   "fs/inotify",
-		File:   strings.TrimPrefix(ei.Path(), abs+"/"),
-		Event:  ei.Event().String(),
-		Cookie: data.Cookie,
-		Data:   ei.Sys().(*unix.InotifyEvent),
+		Topic:     "rebouncer/fs/inotify",
+		File:      strings.TrimPrefix(ei.Path(), abs+"/"),
+		Operation: ei.Event().String(),
+		TxID:      data.Cookie,
+		Data:      data,
 	}
 	niceChannel <- n
 }
-
-func NiceEventToRebounceEvent(e NiceEvent, rbChannel chan NiceEvent) {
-	e.Type = "Nice_to_rebounce"
-	rbChannel <- e
-}
-
-/*
-func thisIsTheLastEventInThisArrayReferencingThisFilename(j int, eventInQuestion NiceEvent, arr []NiceEvent) bool {
-
-	var x int
-
-	for i, e := range arr {
-		if e.File == eventInQuestion.File {
-			x = i
-		}
-	}
-
-	return (j == x)
-}
-*/
 
 func NormalizeEvents(inEvents []NiceEvent) []NiceEvent {
 	var r []NiceEvent = inEvents
