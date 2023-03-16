@@ -77,7 +77,7 @@ func NormalizeEvents(inEvents []NiceEvent) []NiceEvent {
 // WatchDirectory emits events to the "niceEvents" channel
 func WatchDirectory(path string, niceEvents chan NiceEvent) error {
 
-	var fsEvents = make(chan notify.EventInfo, BufferLength)
+	var fsEvents = make(chan notify.EventInfo, DefaultBufferSize)
 	err := notify.Watch(path+"/...", fsEvents, notify.All)
 
 	if err == nil {
