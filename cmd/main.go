@@ -19,7 +19,14 @@ func init() {
 
 func main() {
 
-	niceEvents := make(chan rebouncer.NiceEvent, rebouncer.BufferLength)
+	rebel := rebouncer.New(rebouncer.Config{
+		BufferSize: 1024,
+	})
+
+	fmt.Println("*** Rebouncer ***")
+	fmt.Printf("%+v\n", rebel.Info())
+
+	niceEvents := rebel.Subscribe()
 
 	if err := rebouncer.WatchDirectory(*watchDir, niceEvents); err != nil {
 		log.Fatal(err)

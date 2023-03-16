@@ -4,4 +4,10 @@ go 1.20
 
 require github.com/rjeczalik/notify v0.9.3
 
-require golang.org/x/sys v0.6.0 // indirect
+require github.com/google/uuid v1.3.0
+
+require (
+	github.com/coreos/go-systemd/v22 v22.5.0
+	github.com/denisbrodbeck/machineid v1.0.1
+	golang.org/x/sys v0.6.0
+)
