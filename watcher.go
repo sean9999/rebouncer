@@ -1,7 +1,6 @@
 package rebouncer
 
 import (
-	"fmt"
 	"path/filepath"
 	"strings"
 
@@ -12,18 +11,6 @@ import (
 const WatchMask = notify.InModify | notify.InCloseWrite |
 	notify.InMovedFrom | notify.InMovedTo | notify.InCreate |
 	notify.InDelete | notify.InDeleteSelf | notify.InMoveSelf
-
-type NiceEvent struct {
-	Type   string
-	File   string
-	Event  string
-	Cookie uint32
-	Data   *unix.InotifyEvent
-}
-
-func (e NiceEvent) Dump() string {
-	return fmt.Sprintf("%s:\t%s\t%+v (cookie=%x)", e.Event, e.File, e.Data, e.Cookie)
-}
 
 func NotifyEventInfoToNiceEvent(ei notify.EventInfo, path string, niceChannel chan NiceEvent) {
 	abs, _ := filepath.Abs(path)

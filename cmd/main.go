@@ -3,7 +3,6 @@ package main
 import (
 	"flag"
 	"fmt"
-	"log"
 
 	"github.com/sean9999/rebouncer"
 )
@@ -23,14 +22,11 @@ func main() {
 		BufferSize: 1024,
 	})
 
+	niceEvents := rebel.Subscribe()
+	go rebel.WatchDir(*watchDir)
+
 	fmt.Println("*** Rebouncer ***")
 	fmt.Printf("%+v\n", rebel.Info())
-
-	niceEvents := rebel.Subscribe()
-
-	if err := rebouncer.WatchDirectory(*watchDir, niceEvents); err != nil {
-		log.Fatal(err)
-	}
 
 	for e := range niceEvents {
 		fmt.Println(e.Dump())
