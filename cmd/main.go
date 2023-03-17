@@ -25,9 +25,6 @@ func main() {
 	niceEvents := rebel.Subscribe()
 	go rebel.WatchDir(*watchDir)
 
-	fmt.Println("*** Rebouncer ***")
-	fmt.Printf("%+v\n", rebel.Info())
-
 	for e := range niceEvents {
 		fmt.Println(e.Dump())
 	}
