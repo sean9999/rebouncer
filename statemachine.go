@@ -1,25 +1,26 @@
 package rebouncer
 
-import (
-	"os"
-
-	"github.com/coreos/go-systemd/v22/sdjournal"
-	"github.com/denisbrodbeck/machineid"
-	"github.com/google/uuid"
-	"github.com/rjeczalik/notify"
-)
+import "sync"
 
 // StateMachine is used to access all necessary methods and data
 type StateMachine interface {
 	Subscribe() chan NiceEvent
 	Version() string
-	Info() machineryInfo
+	Info() map[string]any
 	WatchDir(string)
+	Emit()
+	Injest(NiceEvent)
+}
+
+// pointer to machinery implements StateMachine
+type machinery struct {
+	NiceChannel chan NiceEvent
+	batch       []NiceEvent
+	bufferSize  int
+	mu          sync.Mutex
 }
 
 // pass this in to the New() constructor
-//
-//	should contain any info we have at instantiation-time
 type Config struct {
 	BufferSize int
 }
@@ -28,81 +29,76 @@ type Config struct {
 func New(config Config) StateMachine {
 	m := machinery{
 		NiceChannel: make(chan NiceEvent),
-		machineId:   getMachineId(),
-		bootId:      getBootId(),
-		processId:   os.Getpid(),
-		sessionId:   uuid.NewString(),
 		bufferSize:  config.BufferSize,
 	}
-	return m
+	return &m
 }
 
-func (m machinery) WatchDir(dir string) {
+// Injest takes a NiceEvent and appends it to *batch
+//
+//	It may contain logic to filter out events we're not interested in
+//
+// It should also contain logic to decide whether to Emit() (to send along a bunch of NiceEvents to the consumer)
+func (m *machinery) Injest(e NiceEvent) {
+	m.batch = append(m.batch, e)
 
-	var fsEvents = make(chan notify.EventInfo, DefaultBufferSize)
-	err := notify.Watch(dir+"/...", fsEvents, notify.All)
-	if err != nil {
-		panic(err)
+	//	let's say when there are 15 events, we Emit()
+
+	if len(m.batch) > 14 {
+		m.Emit()
 	}
-	go func() {
-		for fsEvent := range fsEvents {
-			NotifyEventInfoToNiceEvent(fsEvent, dir, m.NiceChannel)
+
+}
+
+func (m *machinery) Emit() {
+
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	niceMap := map[string]NiceEvent{}
+
+	for _, niceEvent := range m.batch {
+		fileName := niceEvent.File
+		batchedEvent, existsInMap := niceMap[fileName]
+
+		//	only process non-temp files
+		if !isTempFile(fileName) {
+			if existsInMap {
+				switch {
+				case batchedEvent.Operation == "notify.Create" && niceEvent.Operation == "notify.Remove":
+					//	a Create followed by a Remove means nothing of significance happened. Purge the record
+					delete(niceMap, fileName)
+				default:
+					//	the default case should be to overwrite the record
+					niceEvent.Topic = "rebouncer/outgoing/overwrite"
+					niceMap[fileName] = niceEvent
+				}
+			} else {
+				niceEvent.Topic = "rebouncer/outgoing/virginal"
+				niceMap[niceEvent.File] = niceEvent
+			}
 		}
-	}()
-}
 
-// an ID unique to this computer
-func getMachineId() string {
-	id, err := machineid.ProtectedID("rebouncer/" + version)
-	if err != nil {
-		id = "0"
 	}
-	return id
-}
 
-// returns the Linux & SystemD BootID if available, otherwise "0"
-func getBootId() string {
-	j, err := sdjournal.NewJournal()
-	if err != nil {
-		return "0"
+	for _, ev := range niceMap {
+		m.NiceChannel <- ev
 	}
-	defer j.Close()
-	bootId, err := j.GetBootID()
-	if err != nil {
-		return "0"
-	}
-	return bootId
+
+	m.batch = nil
+	niceMap = nil
+
 }
 
-type machineryInfo struct {
-	machineId  string
-	bootId     string
-	processId  int
-	sessionId  string
-	bufferSize int
-}
-
-type machinery struct {
-	NiceChannel chan NiceEvent
-	machineId   string
-	bootId      string
-	processId   int
-	sessionId   string
-	bufferSize  int
-}
-
-func (m machinery) Subscribe() chan NiceEvent {
+func (m *machinery) Subscribe() chan NiceEvent {
 	return m.NiceChannel
 }
-func (m machinery) Version() string {
-	return version
+func (m *machinery) Version() string {
+	return appVersion
 }
-func (m machinery) Info() machineryInfo {
-	return machineryInfo{
-		machineId:  m.machineId,
-		bootId:     m.bootId,
-		processId:  m.processId,
-		sessionId:  m.sessionId,
-		bufferSize: m.bufferSize,
+func (m *machinery) Info() map[string]any {
+	r := map[string]any{
+		"bufferSize": m.bufferSize,
 	}
+	return r
 }
