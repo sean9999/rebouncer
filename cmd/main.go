@@ -2,14 +2,13 @@ package main
 
 import (
 	"flag"
+	"fmt"
+	"time"
 
-	"github.com/rjeczalik/notify"
 	"github.com/sean9999/rebouncer"
 )
 
-var (
-	watchDir *string
-)
+var watchDir *string
 
 func init() {
 	//	parse options and arguments
@@ -20,17 +19,30 @@ func init() {
 
 func main() {
 
-	fsEvents := make(chan any)
-	rootDirectory := *watchDir + "/..."
-	err := notify.Watch(rootDirectory, fsEvents, notify.All)
-	if err != nil {
-		panic(err)
+	//	instantiate
+	rebel := rebouncer.New(rebouncer.Config{
+		BufferSize: 1024,
+	})
+
+	//	start the watcher
+	go rebel.WatchDir(*watchDir)
+
+	//	start a ticker
+
+	tick := time.NewTicker(time.Hour)
+
+	go func() {
+		for t := range tick.C {
+			fmt.Println("tick", t)
+		}
+	}()
+
+	//	here is the channel we can listen on
+	outgoingEvents := rebel.Subscribe()
+
+	for e := range outgoingEvents {
+		tick.Reset(3 * time.Second)
+		fmt.Println(e.Dump())
 	}
-
-	info := rebouncer.Info{Dir: rootDirectory}
-
-	var mapper rebouncer.Mapper
-
-	rebouncedEvents := rebouncer.Setup(info, fsEvents, rebouncer.DefaultMapFunction, rebouncer.DefaultReduceFunction)
 
 }

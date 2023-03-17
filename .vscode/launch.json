@@ -2,20 +2,12 @@
     "version": "0.2.0",
     "configurations": [
         {
-            "name": "Full test suite",
-            "type": "go",
-            "request": "launch",
-            "mode": "test",
-            "program": "${workspaceFolder}",
-            "args": []
-        },
-        {
-            "name": "Launch Binary",
+            "name": "run on ./tmp/**",
             "type": "go",
             "request": "launch",
             "mode": "auto",
             "program": "${workspaceFolder}/cmd/main.go",
-            "args": ["-dir=${workspaceFolder}/tmp"]
+            "args": ["--dir", "${workspaceFolder}/tmp"]
         }
     ]
 }
