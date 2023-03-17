@@ -3,6 +3,7 @@ package main
 import (
 	"flag"
 	"fmt"
+	"time"
 
 	"github.com/sean9999/rebouncer"
 )
@@ -18,14 +19,29 @@ func init() {
 
 func main() {
 
+	//	instantiate
 	rebel := rebouncer.New(rebouncer.Config{
 		BufferSize: 1024,
 	})
 
-	niceEvents := rebel.Subscribe()
-	go rebel.WatchDirectory(*watchDir)
+	//	start the watcher
+	go rebel.WatchDir(*watchDir)
 
-	for e := range niceEvents {
+	//	start a ticker
+
+	tick := time.NewTicker(time.Hour)
+
+	go func() {
+		for t := range tick.C {
+			fmt.Println("tick", t)
+		}
+	}()
+
+	//	here is the channel we can listen on
+	outgoingEvents := rebel.Subscribe()
+
+	for e := range outgoingEvents {
+		tick.Reset(3 * time.Second)
 		fmt.Println(e.Dump())
 	}
 

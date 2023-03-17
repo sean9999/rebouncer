@@ -4,8 +4,6 @@ import (
 	"fmt"
 	"sync/atomic"
 	"time"
-
-	"golang.org/x/sys/unix"
 )
 
 var UniqueEventId uint64
@@ -17,8 +15,11 @@ type NiceEvent struct {
 	Topic         string // a type of message (ex: "rebouncer/fs/inotify", or "rebouncer/fs/nice", or "rebouncer/lifecycle/shutdown")
 	File          string // the file being operated on. A path relative to *watchDir
 	OccurredAt    time.Time
-	Operation     string             // ex: Create, Delete, Modify
-	Data          *unix.InotifyEvent // original event. only for debugging. Let's delete asap
+	Operation     string // ex: Create, Delete, Modify
+}
+
+func (e NiceEvent) IsZeroed() bool {
+	return (e.id == 0 && e.TransactionId == 0 && e.Topic == "")
 }
 
 func NextEventId() uint64 {

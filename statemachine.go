@@ -1,6 +1,8 @@
 package rebouncer
 
-import "sync"
+import (
+	"sync"
+)
 
 // StateMachine is used to access all necessary methods and data
 type StateMachine interface {
@@ -14,10 +16,10 @@ type StateMachine interface {
 
 // pointer to machinery implements StateMachine
 type machinery struct {
-	NiceChannel chan NiceEvent
-	batch       []NiceEvent
-	bufferSize  int
-	mu          sync.Mutex
+	OutgoingEvents chan NiceEvent
+	batchMap       map[string]NiceEvent
+	bufferSize     int
+	mu             sync.Mutex
 }
 
 // pass this in to the New() constructor
@@ -28,70 +30,59 @@ type Config struct {
 // The easiest way to create a new StateMachine
 func New(config Config) StateMachine {
 	m := machinery{
-		NiceChannel: make(chan NiceEvent),
-		bufferSize:  config.BufferSize,
+		OutgoingEvents: make(chan NiceEvent),
+		bufferSize:     config.BufferSize,
+		batchMap:       map[string]NiceEvent{},
 	}
 	return &m
 }
 
-// Injest takes a NiceEvent and appends it to *batch
+// Injest takes a NiceEvent and either appends it to batchMap or ignores it
 //
-//	It may contain logic to filter out events we're not interested in
-//
-// It should also contain logic to decide whether to Emit() (to send along a bunch of NiceEvents to the consumer)
-func (m *machinery) Injest(e NiceEvent) {
-	m.batch = append(m.batch, e)
+//	Additionally, it decides whether to call Emit() or not
+func (m *machinery) Injest(newEvent NiceEvent) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
 
-	//	let's say when there are 15 events, we Emit()
+	fileName := newEvent.File
+	existingEvent, existsInMap := m.batchMap[fileName]
 
-	if len(m.batch) > 14 {
+	//	only process non-temp files and valid events
+	if !isTempFile(fileName) && !newEvent.IsZeroed() {
+		if existsInMap {
+			switch {
+			case existingEvent.Operation == "notify.Create" && newEvent.Operation == "notify.Remove":
+				//	a Create followed by a Remove means nothing of significance happened. Purge the record
+				delete(m.batchMap, fileName)
+			default:
+				//	the default case should be to overwrite the record
+				newEvent.Topic = "rebouncer/outgoing/1"
+				m.batchMap[fileName] = newEvent
+			}
+		} else {
+			newEvent.Topic = "rebouncer/outgoing/0"
+			m.batchMap[newEvent.File] = newEvent
+		}
+	}
+
+	if len(m.batchMap) > 3 {
 		m.Emit()
 	}
 
 }
 
+// Emits all the queued NiceEvents to OutgoingEvents
 func (m *machinery) Emit() {
-
-	m.mu.Lock()
-	defer m.mu.Unlock()
-
-	niceMap := map[string]NiceEvent{}
-
-	for _, niceEvent := range m.batch {
-		fileName := niceEvent.File
-		batchedEvent, existsInMap := niceMap[fileName]
-
-		//	only process non-temp files
-		if !isTempFile(fileName) {
-			if existsInMap {
-				switch {
-				case batchedEvent.Operation == "notify.Create" && niceEvent.Operation == "notify.Remove":
-					//	a Create followed by a Remove means nothing of significance happened. Purge the record
-					delete(niceMap, fileName)
-				default:
-					//	the default case should be to overwrite the record
-					niceEvent.Topic = "rebouncer/outgoing/overwrite"
-					niceMap[fileName] = niceEvent
-				}
-			} else {
-				niceEvent.Topic = "rebouncer/outgoing/virginal"
-				niceMap[niceEvent.File] = niceEvent
-			}
-		}
-
+	//m.mu.Lock()
+	//defer m.mu.Unlock()
+	for _, niceEvent := range m.batchMap {
+		m.OutgoingEvents <- niceEvent
 	}
-
-	for _, ev := range niceMap {
-		m.NiceChannel <- ev
-	}
-
-	m.batch = nil
-	niceMap = nil
-
+	m.batchMap = map[string]NiceEvent{}
 }
 
 func (m *machinery) Subscribe() chan NiceEvent {
-	return m.NiceChannel
+	return m.OutgoingEvents
 }
 func (m *machinery) Version() string {
 	return appVersion

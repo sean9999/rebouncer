@@ -56,7 +56,6 @@ func NotifyToNiceEvent(ei notify.EventInfo, path string) NiceEvent {
 	e.File = normalFile
 	e.Operation = ei.Event().String()
 	e.TransactionId = data.Cookie
-	e.Data = data
 
 	return e
 
@@ -76,4 +75,3 @@ func (m *machinery) WatchDir(dir string) {
 		}
 	}()
 }
-
