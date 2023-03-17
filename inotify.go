@@ -39,7 +39,6 @@ func containsOnlyNumbers(s string) bool {
 	return r
 }
 
-// temp files could be only numbers, or end in "~"
 func isTempFile(path string) bool {
 	return endsInTilde(path) && containsOnlyNumbers(path)
 }
@@ -78,16 +77,3 @@ func (m *machinery) WatchDir(dir string) {
 	}()
 }
 
-func NormalizeEvents(inEvents []NiceEvent) []NiceEvent {
-	var r []NiceEvent = inEvents
-
-	/*
-		for i, thisEvent := range inEvents {
-			if thisIsTheLastEventInThisArrayReferencingThisFilename(i, thisEvent, inEvents) {
-				r = append(r, thisEvent)
-			}
-		}
-	*/
-
-	return r
-}

@@ -36,5 +36,5 @@ func NewNiceEvent(topic string) NiceEvent {
 }
 
 func (e NiceEvent) Dump() string {
-	return fmt.Sprintf("%s:\t%s\t%+v (cookie=%x)", e.Operation, e.File, e.Data, e.TransactionId)
+	return fmt.Sprintf("%+v", e)
 }

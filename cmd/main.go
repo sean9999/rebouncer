@@ -23,7 +23,7 @@ func main() {
 	})
 
 	niceEvents := rebel.Subscribe()
-	go rebel.WatchDir(*watchDir)
+	go rebel.WatchDirectory(*watchDir)
 
 	for e := range niceEvents {
 		fmt.Println(e.Dump())
