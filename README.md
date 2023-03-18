@@ -10,17 +10,17 @@
 
 [![Go version](https://img.shields.io/github/go-mod/go-version/sean9999/rebouncer.svg)](https://github.com/sean9999/rebouncer)
 
-## A Powerful Debouncer for your Conjuring
+## A Powerful Debouncer for your Conjuring Needs
 
 ![Hand of Fish](/docs/hand.jpg)
 
-Rebouncer is a generic library takes a noisy source of events, and produces a cleaner source.
+Rebouncer is a generic library that takes a noisy source of events, and produces a cleaner source.
 
 It employes a plugin architecture that can allow it to be used flexibly whenever the fan-out/fan-in concurrency pattern is needed.
 
-The canonical case is a file-watcher that discards events involving temp files and other artefacts, providing it's consumer with a clean, sane, and curated source of events. 
+The canonical case is a file-watcher that discards events involving temp files and other artefacts, providing it's consumer with a clean, sane, and curated source of events. It is the engine behind [Fasthak](https://www.seanmacdonald.ca/posts/fasthak/).
 
-For that case, rebouncer is also available as a binary, which takes a directory as an argument, producing SSE events to stdout.
+For the canonical case, rebouncer is also available as a binary. It takes a directory as an argument, producing SSE events to stdout.
 
 ## Using it as a binary
 
@@ -55,45 +55,32 @@ Rebouncer needs a few basic components, to be passed in. Let's go over them. Our
 
 ### Injestor
 
-An injestor is defined as
+An injestor is defined as runs in a go routine, and sends events of interest to Rebouncer, pushing them onto the Queue.
+
+### Reducer
+
+Reducer operates on the entire Queue, each time Injestor runs, modifiying, removing, or even adding events as needed.
+
+### Quantizer
+
+Runs in a go routine, keeping tabs on the Queue and telling Rebouncer when it's ready for a Flush().
+
+The simplest case for use in a library is, again, the canonical case of a file-watcher, for which there is a convenience function:
 
 ```go
-type Injestor[Subtype any] func() chan NiceEvent
-```
+package main
 
-This is where you listen on your original source of events, and for each event you get you transform it to a niceEvent. You pass back your NiceEvent channel, and it will continue to receive traffic.
+import (
+	"fmt"
+	"github.com/sean9999/rebouncer"
+)
 
-A NiceEvent is our basic unit. It is a simple struct that we can rely on and reason about
+//	watch ./build and emit every 1000 milliseconds
+stateMachine := rebouncer.NewInotify("./build", 1000)
 
-```go
-type NiceEvent[T any] struct {
-    id unit64 // should be be unique
-    Topic string // ex: "rebouncer/inotify/output
-    Data T // it's up to you what to put here
+for niceEvent := range stateMachine.Subscribe() {
+	fmt.Println(niceEvent.Dump())
 }
 ```
 
-Our Injestor might look like this:
-
-```go
-injestor := func() chan NiceEvent {
-    niceEventChannel := make(chan, NiceEvent)
-	
-    //  these are the events we're injesting, but Rebouncer has no direct access to
-    var fsEvents = make(chan notify.EventInfo, DefaultBufferSize)
-	err := notify.Watch(dir+"/...", fsEvents, WatchMask)
-	if err != nil {
-		panic(err)
-	}
-
-    //  we're spawning a go routine, listening for notify events, transformatin them to NiceEvents, and pushing them to a channel which we return
-	go func() {
-		for fsEvent := range fsEvents {
-
-
-
-			//m.Push(NotifyToNiceEvent(fsEvent, dir))
-		}
-	}() 
-}
-```
+For more detailed docs, see [the docs](https://godoc.org/sean9999/go/rebouncer)

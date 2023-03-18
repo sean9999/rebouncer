@@ -1,17 +1,19 @@
 package rebouncer
 
 import (
-	"fmt"
 	"sync"
 )
 
-// StateMachine is used to access all necessary methods and data
+// StateMachine respresents access all necessary methods. It is the entrypoint for the app.
+// The [New] constructor should be used to create instances which can fulfil these methods.
 type StateMachine interface {
 	Subscribe() chan NiceEvent
 	Version() string
 	Info() map[string]any
 	WatchDir(string)
 	Emit()
+	GetQueue() []NiceEvent
+	SetQueue([]NiceEvent) error
 	Push(NiceEvent)
 	Quantize(chan bool, *[]NiceEvent)
 	Reduce([]NiceEvent) []NiceEvent
@@ -27,7 +29,7 @@ type userFunctions struct {
 type machinery struct {
 	OutgoingEvents chan NiceEvent // NiceEvents for our consumer
 	readyChan      chan bool      // whe true is sent here, a batch is ready
-	batchArray     []NiceEvent    // an intermediary storage mechanism
+	Queue          []NiceEvent    // an intermediary storage mechanism
 	bufferSize     int            // all channels should have this buffer size
 	mu             sync.Mutex     // lock batchMap when we're processing it
 	user           userFunctions  // user passes in these functions
@@ -48,7 +50,7 @@ func New(config Config) StateMachine {
 		OutgoingEvents: make(chan NiceEvent, config.BufferSize),
 		readyChan:      make(chan bool, config.BufferSize),
 		bufferSize:     config.BufferSize,
-		batchArray:     []NiceEvent{},
+		Queue:          []NiceEvent{},
 		user: userFunctions{
 			quantizer: config.Quantizer,
 			reducer:   config.Reducer,
@@ -77,10 +79,15 @@ func New(config Config) StateMachine {
 	return &m
 }
 
-func (m *machinery) Shlock() {
+func (m *machinery) GetQueue() []NiceEvent {
+	return m.Queue
+}
+
+func (m *machinery) SetQueue(eventSlice []NiceEvent) error {
 	m.mu.Lock()
-	fmt.Println("shlock")
+	m.Queue = eventSlice
 	m.mu.Unlock()
+	return nil
 }
 
 func (m *machinery) Reduce(inEvents []NiceEvent) []NiceEvent {
@@ -92,9 +99,9 @@ func (m *machinery) Reduce(inEvents []NiceEvent) []NiceEvent {
 //
 //	Additionally, it decides whether to call Emit() or not
 func (m *machinery) Push(newEvent NiceEvent) {
-	m.batchArray = append(m.batchArray, newEvent)
-	m.batchArray = m.Reduce(m.batchArray)
-	go m.Quantize(m.readyChan, &m.batchArray)
+	m.Queue = append(m.Queue, newEvent)
+	m.Queue = m.Reduce(m.Queue)
+	go m.Quantize(m.readyChan, &m.Queue)
 }
 
 // Quantize runs after Injest() and decides whether or not to call Emit()
@@ -105,18 +112,25 @@ func (m *machinery) Quantize(readyChannel chan bool, em *[]NiceEvent) {
 
 // Emits all the queued NiceEvents to OutgoingEvents
 func (m *machinery) Emit() {
-	for _, e := range m.batchArray {
+	//m.mu.Lock()
+	for _, e := range m.Queue {
 		m.OutgoingEvents <- e
 	}
-	m.batchArray = []NiceEvent{}
+	m.Queue = []NiceEvent{}
+	//m.mu.Unlock()
 }
 
+// the channel of NiceEvents we want to operate on
 func (m *machinery) Subscribe() chan NiceEvent {
 	return m.OutgoingEvents
 }
+
+// returns the application version string
 func (m *machinery) Version() string {
 	return appVersion
 }
+
+// returns useful (maybe?) information
 func (m *machinery) Info() map[string]any {
 	r := map[string]any{
 		"bufferSize": m.bufferSize,

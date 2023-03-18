@@ -6,7 +6,7 @@ import (
 	"github.com/sean9999/rebouncer"
 )
 
-// This is a basic example showing how to work with notify.Watch function.
+// Instatiating an inotify-backed file-watcher using the verbose method.
 func ExampleNew() {
 
 	interval := 3000      // how long to wait in between flushes, in milliseconds
@@ -16,7 +16,7 @@ func ExampleNew() {
 	rebecca := rebouncer.New(rebouncer.Config{
 		BufferSize: rebouncer.DefaultBufferSize,
 		Quantizer:  rebouncer.DefaultInotifyQuantizer(interval),
-		Reducer:    rebouncer.DefaultInotifyReducer,
+		Reducer:    rebouncer.DefaultInotifyReduce,
 		Injestor:   rebouncer.DefaultInotifyInjestor(watchDir, rebouncer.DefaultBufferSize),
 	})
 

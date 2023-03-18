@@ -13,15 +13,8 @@ To use the binary as a file-watcher:
 
 To use it as a library, but again employing it as an inotify-backed filewatcher:
 
-	jarf := 5
-	func poop(){
-		fmt.Println("cool", jarf)
-	}
-
-
-	func ok() string {
-		return "yay"
-	}
+	stateMachine := rebouncer.NewInotify("./build", 1000)
+	niceChannel := stateMachine.Subscribe()
 
 Although Rebouncer provides convenience functions for common cases (such as file-watcher using inotify), an understanding of its basic architecture is necessary for more advanced uses.
 
