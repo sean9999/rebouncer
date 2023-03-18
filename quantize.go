@@ -1,11 +1,11 @@
 package rebouncer
 
 import (
-	"fmt"
 	"time"
 )
 
-// Quantizer runs in a go routine and emits to machinery.ticker.C when it decides we're ready to batch up our events
+// Quantizer runs in a go routine and sends true to readyChannel when it decides we're ready to Emit()
+// it has access to the entire batch in the Queue to help make this decision.
 type Quantizer func(chan bool, *[]NiceEvent)
 
 // simply waits ms milliseconds and then sends true, causing Emit() to run, sending NiceEvents back to the consumer
@@ -13,12 +13,9 @@ type Quantizer func(chan bool, *[]NiceEvent)
 func DefaultInotifyQuantizer(ms int) Quantizer {
 	ticker := time.NewTicker(time.Minute)
 	qFunc := func(readyChan chan bool, em *[]NiceEvent) {
-		fmt.Println("quantizer func", ms)
-		ticker.Reset(3 * time.Second)
+		ticker.Reset(time.Duration(ms) * time.Millisecond)
 		for range ticker.C {
-			lengthOfArray := len(*em)
 			ready := (len(*em) > 0)
-			fmt.Println("ticker", ready, lengthOfArray)
 			readyChan <- ready
 		}
 	}
