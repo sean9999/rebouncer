@@ -14,11 +14,12 @@ type StateMachine interface {
 	WatchDir(string)
 	Emit()
 	Injest(NiceEvent)
-	Quantize(chan bool, *EventMap)
+	Quantize(chan bool, *[]NiceEvent)
 }
 
 type userFunctions struct {
 	quantizer Quantizer
+	reducer   Reducer
 }
 
 // pointer to machinery implements StateMachine
@@ -26,9 +27,10 @@ type machinery struct {
 	OutgoingEvents chan NiceEvent // NiceEvents for our consumer
 	readyChan      chan bool      // whe true is sent here, a batch is ready
 	batchMap       EventMap       // an intermediary storage mechanism
-	bufferSize     int            // all channels should have this buffer size
-	mu             sync.Mutex     // lock batchMap when we're processing it
-	userFuncs      userFunctions  // user passes in these functions
+	batchArray     []NiceEvent
+	bufferSize     int           // all channels should have this buffer size
+	mu             sync.Mutex    // lock batchMap when we're processing it
+	userFuncs      userFunctions // user passes in these functions
 	ticker         time.Ticker
 }
 
@@ -36,18 +38,21 @@ type machinery struct {
 type Config struct {
 	BufferSize int
 	Quantizer  Quantizer
+	Reducer    Reducer
 }
 
 // The easiest way to create a new StateMachine
 func New(config Config) StateMachine {
 
 	m := machinery{
-		OutgoingEvents: make(chan NiceEvent, 1024),
-		readyChan:      make(chan bool, 1024),
+		OutgoingEvents: make(chan NiceEvent, config.BufferSize),
+		readyChan:      make(chan bool, config.BufferSize),
 		bufferSize:     config.BufferSize,
 		batchMap:       EventMap{},
+		batchArray:     []NiceEvent{},
 		userFuncs: userFunctions{
 			quantizer: config.Quantizer,
+			reducer:   config.Reducer,
 		},
 		ticker: *time.NewTicker(5 * time.Minute),
 	}
@@ -77,35 +82,14 @@ func (m *machinery) Injest(newEvent NiceEvent) {
 	//m.mu.Lock()
 	//defer m.mu.Unlock()
 
-	fmt.Println("injest")
-
-	fileName := newEvent.File
-	existingEvent, existsInMap := m.batchMap[fileName]
-
-	//	only process non-temp files and valid events
-	if !isTempFile(fileName) && !newEvent.IsZeroed() {
-		if existsInMap {
-			switch {
-			case existingEvent.Operation == "notify.Create" && newEvent.Operation == "notify.Remove":
-				//	a Create followed by a Remove means nothing of significance happened. Purge the record
-				delete(m.batchMap, fileName)
-			default:
-				//	the default case should be to overwrite the record
-				newEvent.Topic = "rebouncer/outgoing/1"
-				m.batchMap[fileName] = newEvent
-			}
-		} else {
-			newEvent.Topic = "rebouncer/outgoing/0"
-			m.batchMap[newEvent.File] = newEvent
-		}
-	}
-
-	go m.Quantize(m.readyChan, &m.batchMap)
+	m.batchArray = append(m.batchArray, newEvent)
+	m.batchArray = m.userFuncs.reducer(m.batchArray)
+	go m.Quantize(m.readyChan, &m.batchArray)
 
 }
 
 // Quantize runs after Injest() and decides whether or not to call Emit()
-func (m *machinery) Quantize(readyChannel chan bool, em *EventMap) {
+func (m *machinery) Quantize(readyChannel chan bool, em *[]NiceEvent) {
 	fmt.Println("Quantize()")
 	fn := m.userFuncs.quantizer
 	go fn(readyChannel, em)
@@ -115,12 +99,13 @@ func (m *machinery) Quantize(readyChannel chan bool, em *EventMap) {
 func (m *machinery) Emit() {
 	//m.mu.Lock()
 	//defer m.mu.Unlock()
-	for _, niceEvent := range m.batchMap {
-		m.OutgoingEvents <- niceEvent
+
+	for _, e := range m.batchArray {
+		m.OutgoingEvents <- e
 	}
-	fmt.Println("Emit()")
-	m.batchMap = EventMap{}
-	fmt.Println(m.batchMap)
+
+	m.batchArray = []NiceEvent{}
+
 }
 
 func (m *machinery) Subscribe() chan NiceEvent {
