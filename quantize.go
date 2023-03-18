@@ -1,24 +1,26 @@
 package rebouncer
 
-// Quantizer takes a NiceEvent, adds it to a queue, and decides when to send off a batch
-type Quantizer func(NiceEvent)
+import (
+	"fmt"
+	"time"
+)
 
-//var thisBatch []NiceEvent
+// Quantizer runs in a go routine and emits to machinery.ticker.C when it decides we're ready to batch up our events
+type Quantizer func(chan bool, *EventMap)
 
-// Quantize receives NiceEvents, batches them, and sends them to a channel taking BatchEvents
-//
-// @todo: seperate out a "Quantize" function that can be injected.
-// @todo: make channels read-only or write-only as appropriate
-/*
-func Quantize(inchannel chan NiceEvent, outchannel chan []NiceEvent) {
-
-	select {
-	case e := <-inchannel:
-		//	do some cleansing
-		thisBatch = append(thisBatch, e)
-	case <-time.After(3 * time.Second):
-		outchannel <- thisBatch
-		thisBatch = nil
+// simply waits ms milliseconds and then sends true, causing Emit() to run, sending NiceEvents back to the consumer
+// this would be the most common and straightforward pattern for filesystem watchers
+func DefaultInotifyQuantizer(ms int) Quantizer {
+	ticker := time.NewTicker(time.Minute)
+	qFunc := func(readyChan chan bool, em *EventMap) {
+		fmt.Println("quantizer func", ms)
+		ticker.Reset(3 * time.Second)
+		for range ticker.C {
+			lengthOfMap := len(*em)
+			ready := (len(*em) > 0)
+			fmt.Println("ticker", ready, lengthOfMap)
+			readyChan <- ready
+		}
 	}
+	return qFunc
 }
-*/

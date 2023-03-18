@@ -18,6 +18,8 @@ type NiceEvent struct {
 	Operation     string // ex: Create, Delete, Modify
 }
 
+type EventMap map[string]NiceEvent
+
 func (e NiceEvent) IsZeroed() bool {
 	return (e.id == 0 && e.TransactionId == 0 && e.Topic == "")
 }
