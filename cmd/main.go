@@ -26,6 +26,7 @@ func main() {
 	rebecca := rebouncer.New(rebouncer.Config{
 		BufferSize: 1024,
 		Quantizer:  rebouncer.DefaultInotifyQuantizer(*flushPeriod),
+		Reducer:    rebouncer.DefaultInotifyReducer,
 	})
 	go rebecca.WatchDir(*watchDir)
 
