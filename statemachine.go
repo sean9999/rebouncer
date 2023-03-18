@@ -1,7 +1,9 @@
 package rebouncer
 
 import (
+	"fmt"
 	"sync"
+	"time"
 )
 
 // StateMachine is used to access all necessary methods and data
@@ -12,37 +14,70 @@ type StateMachine interface {
 	WatchDir(string)
 	Emit()
 	Injest(NiceEvent)
+	Quantize(chan bool, *EventMap)
+}
+
+type userFunctions struct {
+	quantizer Quantizer
 }
 
 // pointer to machinery implements StateMachine
 type machinery struct {
-	OutgoingEvents chan NiceEvent
-	batchMap       map[string]NiceEvent
-	bufferSize     int
-	mu             sync.Mutex
+	OutgoingEvents chan NiceEvent // NiceEvents for our consumer
+	readyChan      chan bool      // whe true is sent here, a batch is ready
+	batchMap       EventMap       // an intermediary storage mechanism
+	bufferSize     int            // all channels should have this buffer size
+	mu             sync.Mutex     // lock batchMap when we're processing it
+	userFuncs      userFunctions  // user passes in these functions
+	ticker         time.Ticker
 }
 
 // pass this in to the New() constructor
 type Config struct {
 	BufferSize int
+	Quantizer  Quantizer
 }
 
 // The easiest way to create a new StateMachine
 func New(config Config) StateMachine {
+
 	m := machinery{
-		OutgoingEvents: make(chan NiceEvent),
+		OutgoingEvents: make(chan NiceEvent, 1024),
+		readyChan:      make(chan bool, 1024),
 		bufferSize:     config.BufferSize,
-		batchMap:       map[string]NiceEvent{},
+		batchMap:       EventMap{},
+		userFuncs: userFunctions{
+			quantizer: config.Quantizer,
+		},
+		ticker: *time.NewTicker(5 * time.Minute),
 	}
+
+	//	Emit() whenever we get true on readyChan
+	go func() {
+		for isReady := range m.readyChan {
+			if isReady {
+				m.Emit()
+			}
+		}
+	}()
+
 	return &m
+}
+
+func (m *machinery) Shlock() {
+	m.mu.Lock()
+	fmt.Println("shlock")
+	m.mu.Unlock()
 }
 
 // Injest takes a NiceEvent and either appends it to batchMap or ignores it
 //
 //	Additionally, it decides whether to call Emit() or not
 func (m *machinery) Injest(newEvent NiceEvent) {
-	m.mu.Lock()
-	defer m.mu.Unlock()
+	//m.mu.Lock()
+	//defer m.mu.Unlock()
+
+	fmt.Println("injest")
 
 	fileName := newEvent.File
 	existingEvent, existsInMap := m.batchMap[fileName]
@@ -65,10 +100,15 @@ func (m *machinery) Injest(newEvent NiceEvent) {
 		}
 	}
 
-	if len(m.batchMap) > 3 {
-		m.Emit()
-	}
+	go m.Quantize(m.readyChan, &m.batchMap)
 
+}
+
+// Quantize runs after Injest() and decides whether or not to call Emit()
+func (m *machinery) Quantize(readyChannel chan bool, em *EventMap) {
+	fmt.Println("Quantize()")
+	fn := m.userFuncs.quantizer
+	go fn(readyChannel, em)
 }
 
 // Emits all the queued NiceEvents to OutgoingEvents
@@ -78,7 +118,9 @@ func (m *machinery) Emit() {
 	for _, niceEvent := range m.batchMap {
 		m.OutgoingEvents <- niceEvent
 	}
-	m.batchMap = map[string]NiceEvent{}
+	fmt.Println("Emit()")
+	m.batchMap = EventMap{}
+	fmt.Println(m.batchMap)
 }
 
 func (m *machinery) Subscribe() chan NiceEvent {

@@ -75,3 +75,13 @@ func (m *machinery) WatchDir(dir string) {
 		}
 	}()
 }
+
+// A convenience constructor suitable for the common case of watching a directory
+func NewInotify(dir string, bouncePeriod int) StateMachine {
+	rebel := New(Config{
+		BufferSize: 1024,
+		Quantizer:  DefaultInotifyQuantizer(bouncePeriod),
+	})
+	go rebel.WatchDir(dir)
+	return rebel
+}
