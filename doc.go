@@ -1,43 +1,33 @@
-// Copyright (c) 2014-2015 The Notify Authors. All rights reserved.
-// Use of this source code is governed by the MIT license that can be
-// found in the LICENSE file.
+/*
+Rebouncer is a generic library takes a noisy source of events, and produces a cleaner source.
 
-// Package notify implements access to filesystem events.
-//
-// Notify is a high-level abstraction over filesystem watchers like inotify,
-// kqueue, FSEvents, FEN or ReadDirectoryChangesW. Watcher implementations are
-// split into two groups: ones that natively support recursive notifications
-// (FSEvents and ReadDirectoryChangesW) and ones that do not (inotify, kqueue, FEN).
-// For more details see watcher and recursiveWatcher interfaces in watcher.go
-// source file.
-//
-// On top of filesystem watchers notify maintains a watchpoint tree, which provides
-// a strategy for creating and closing filesystem watches and dispatching filesystem
-// events to user channels.
-//
-// An event set is just an event list joint using bitwise OR operator
-// into a single event value.
-// Both the platform-independent (see Constants) and specific events can be used.
-// Refer to the event_*.go source files for information about the available
-// events.
-//
-// A filesystem watch or just a watch is platform-specific entity which represents
-// a single path registered for notifications for specific event set. Setting a watch
-// means using platform-specific API calls for creating / initializing said watch.
-// For each watcher the API call is:
-//
-//   - FSEvents: FSEventStreamCreate
-//   - inotify:  notify_add_watch
-//   - kqueue:   kevent
-//   - ReadDirectoryChangesW: CreateFile+ReadDirectoryChangesW
-//   - FEN:      port_get
-//
-// To rewatch means to either shrink or expand an event set that was previously
-// registered during watch operation for particular filesystem watch.
-//
-// A watchpoint is a list of user channel and event set pairs for particular
-// path (watchpoint tree's node). A single watchpoint can contain multiple
-// different user channels registered to listen for one or more events. A single
-// user channel can be registered in one or more watchpoints, recursive and
-// non-recursive ones as well.
+It employs a plugin architecture that can allow it to be used flexibly whenever the fan-out-fan-in concurrency pattern is needed.
+
+The canonical case is a file-watcher that discards events involving temp files and other artefacts, providing it's consumer with a clean, sane, and curated source of events.
+
+For that case, rebouncer is also available as a binary, which takes a directory as an argument, producing SSE events to stdout.
+
+To use the binary as a file-watcher:
+
+	$ rebouncer -dir ./some/dir
+
+To use it as a library, but again employing it as an inotify-backed filewatcher:
+
+	jarf := 5
+	func poop(){
+		fmt.Println("cool", jarf)
+	}
+
+
+	func ok() string {
+		return "yay"
+	}
+
+Although Rebouncer provides convenience functions for common cases (such as file-watcher using inotify), an understanding of its basic architecture is necessary for more advanced uses.
+
+  - an [Injestor] injests your source events, converting them into a format rebouncer can reason about, adding them to the queue
+  - a [Reducer] operates on the entire queue of events, discarding, modifying, or even adding new ones at will
+  - a [Quantizer] is initialized at startup and runs directly after the reducer, deciding where it's time to Emit()
+  - an [Egestor] that formats the output. It is simply a function that takes a [NiceEvent] and returns an AnyEvent
+*/
 package rebouncer
