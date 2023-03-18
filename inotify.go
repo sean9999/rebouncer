@@ -64,14 +64,14 @@ func NotifyToNiceEvent(ei notify.EventInfo, path string) NiceEvent {
 // launch an inotify process that converts to NiceEvents and appends to machinery.batch
 func (m *machinery) WatchDir(dir string) {
 	var fsEvents = make(chan notify.EventInfo, DefaultBufferSize)
-	err := notify.Watch(dir+"/...", fsEvents, notify.All)
+	err := notify.Watch(dir+"/...", fsEvents, WatchMask)
 	if err != nil {
 		panic(err)
 	}
 	go func() {
 		for fsEvent := range fsEvents {
 			//m.batch = append(m.batch, NotifyToNiceEvent(fsEvent, dir))
-			m.Injest(NotifyToNiceEvent(fsEvent, dir))
+			m.Push(NotifyToNiceEvent(fsEvent, dir))
 		}
 	}()
 }
@@ -81,6 +81,7 @@ func NewInotify(dir string, bouncePeriod int) StateMachine {
 	rebel := New(Config{
 		BufferSize: 1024,
 		Quantizer:  DefaultInotifyQuantizer(bouncePeriod),
+		Reducer:    DefaultInotifyReducer,
 	})
 	go rebel.WatchDir(dir)
 	return rebel

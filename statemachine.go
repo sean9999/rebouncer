@@ -12,7 +12,7 @@ type StateMachine interface {
 	Info() map[string]any
 	WatchDir(string)
 	Emit()
-	Injest(NiceEvent)
+	Push(NiceEvent)
 	Quantize(chan bool, *[]NiceEvent)
 	Reduce([]NiceEvent) []NiceEvent
 }
@@ -20,6 +20,7 @@ type StateMachine interface {
 type userFunctions struct {
 	quantizer Quantizer
 	reducer   Reducer
+	injestor  Injestor
 }
 
 // pointer to machinery implements StateMachine
@@ -37,6 +38,7 @@ type Config struct {
 	BufferSize int
 	Quantizer  Quantizer
 	Reducer    Reducer
+	Injestor   Injestor
 }
 
 // The canonical way to create a new StateMachine
@@ -50,10 +52,20 @@ func New(config Config) StateMachine {
 		user: userFunctions{
 			quantizer: config.Quantizer,
 			reducer:   config.Reducer,
+			injestor:  config.Injestor,
 		},
 	}
 
-	//	Emit() whenever we get true on readyChan
+	incomingEvents := m.user.injestor()
+
+	//	listen to events emitted by Injestor
+	go func() {
+		for inEvent := range incomingEvents {
+			m.Push(inEvent)
+		}
+	}()
+
+	//	Emit() whenever we get a 'true' value on readyChan
 	go func() {
 		for isReady := range m.readyChan {
 			if isReady {
@@ -76,20 +88,17 @@ func (m *machinery) Reduce(inEvents []NiceEvent) []NiceEvent {
 	return outEvents
 }
 
-// Injest takes a NiceEvent and either appends it to batchMap or ignores it
+// Push takes a NiceEvent and either appends it to batchMap or ignores it
 //
 //	Additionally, it decides whether to call Emit() or not
-func (m *machinery) Injest(newEvent NiceEvent) {
-
+func (m *machinery) Push(newEvent NiceEvent) {
 	m.batchArray = append(m.batchArray, newEvent)
 	m.batchArray = m.Reduce(m.batchArray)
 	go m.Quantize(m.readyChan, &m.batchArray)
-
 }
 
 // Quantize runs after Injest() and decides whether or not to call Emit()
 func (m *machinery) Quantize(readyChannel chan bool, em *[]NiceEvent) {
-	fmt.Println("Quantize()")
 	fn := m.user.quantizer
 	go fn(readyChannel, em)
 }
@@ -111,6 +120,7 @@ func (m *machinery) Version() string {
 func (m *machinery) Info() map[string]any {
 	r := map[string]any{
 		"bufferSize": m.bufferSize,
+		"version":    m.Version(),
 	}
 	return r
 }
