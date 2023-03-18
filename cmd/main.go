@@ -3,45 +3,37 @@ package main
 import (
 	"flag"
 	"fmt"
-	"time"
 
 	"github.com/sean9999/rebouncer"
 )
 
 var watchDir *string
+var flushPeriod *int
 
 func init() {
 	//	parse options and arguments
 	//	@todo: sanity checking
 	watchDir = flag.String("dir", ".", "what directory to watch")
+	flushPeriod = flag.Int("period", 30000, "how often (in milliseconds) to flush events")
 	flag.Parse()
 }
 
 func main() {
 
 	//	instantiate
-	rebel := rebouncer.New(rebouncer.Config{
+	//rebecca := rebouncer.NewInotify(*watchDir, *flushPeriod)
+
+	rebecca := rebouncer.New(rebouncer.Config{
 		BufferSize: 1024,
+		Quantizer:  rebouncer.DefaultInotifyQuantizer(*flushPeriod),
 	})
-
-	//	start the watcher
-	go rebel.WatchDir(*watchDir)
-
-	//	start a ticker
-
-	tick := time.NewTicker(time.Hour)
-
-	go func() {
-		for t := range tick.C {
-			fmt.Println("tick", t)
-		}
-	}()
+	go rebecca.WatchDir(*watchDir)
 
 	//	here is the channel we can listen on
-	outgoingEvents := rebel.Subscribe()
+	outgoingEvents := rebecca.Subscribe()
 
+	//	for example
 	for e := range outgoingEvents {
-		tick.Reset(3 * time.Second)
 		fmt.Println(e.Dump())
 	}
 
