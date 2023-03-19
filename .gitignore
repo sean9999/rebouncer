@@ -7,8 +7,8 @@
 tmp/
 *.out
 *.log
-# Dependency directories (remove the comment below to include it)
-# vendor/
-
+vendor/
 *.log
 tmp/
+publish.sh
+
