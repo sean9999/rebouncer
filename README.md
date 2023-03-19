@@ -4,7 +4,7 @@
 
 [![Maintenance](https://img.shields.io/badge/Maintained%3F-yes-green.svg)](https://github.com/sean9999/rebouncer/graphs/commit-activity)
 
-[![GoDoc reference example](https://img.shields.io/badge/godoc-reference-blue.svg)](https://godoc.org/sean9999/go/rebouncer)
+[![Go Reference](https://pkg.go.dev/badge/github.com/sean9999/rebouncer.svg)](https://pkg.go.dev/github.com/sean9999/rebouncer)
 
 [![Go Report Card](https://goreportcard.com/badge/github.com/sean9999/rebouncer)](https://goreportcard.com/report/github.com/sean9999/rebouncer)
 
@@ -51,11 +51,11 @@ data: {"file": "css/mobile", "operation": "modify"}</samp>
 
 You may want more flexibility than that. Rebouncer can be invoked as a library, allowing you to embed it in your application and giving you fine-grained control.
 
-Rebouncer needs a few basic components, to be passed in. Let's go over them. Our examples will continue with the paradigm of building a file-watcher
+Rebouncer needs a few basic to be passed in. Continuing the example a file-watcher, let's go over the basic architecture of these plugin lifecycle functions:
 
 ### Injestor
 
-An injestor is defined as runs in a go routine, and sends events of interest to Rebouncer, pushing them onto the Queue.
+An injestor is defined as runs in a go routine, and sends events of interest to Rebouncer, pushing them onto the Queue. It looks like this:
 
 ### Reducer
 
@@ -83,4 +83,17 @@ for niceEvent := range stateMachine.Subscribe() {
 }
 ```
 
-For more detailed docs, see [the docs](https://godoc.org/sean9999/go/rebouncer)
+Calling `rebouncer.NewInotify()` in this way is the equivilant of:
+
+```go
+//	rebecca is our singleton instance
+stateMachine := rebouncer.New(rebouncer.Config{
+	BufferSize: rebouncer.DefaultBufferSize,
+	Quantizer:  rebouncer.DefaultInotifyQuantizer(1000),
+	Reducer:    rebouncer.DefaultInotifyReduce,
+	Injestor:   rebouncer.DefaultInotifyInjestor("./build", rebouncer.DefaultBufferSize),
+})
+
+```
+
+`DefaultInotifyQuantizer()`, `DefaultInotifyReduce()`, and `DefaultInotifyInjestor()` are all themselves convenience functions that alleviate you from having to write your own respective Quantizer, Reducer, and Injestor.
