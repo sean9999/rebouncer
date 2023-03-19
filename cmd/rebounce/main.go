@@ -19,38 +19,6 @@ func init() {
 	flag.Parse()
 }
 
-/*
-
-{	id:1679179339846315599
-	TransactionId:0
-	Topic:rebouncer/inotify/outgoing/clobber
-	File:f2.txt
-	OccurredAt:2023-03-18 18:42:33.557967981 -0400 EDT m=+13.711725019
-	Operation:notify.InCloseWrite
-}
-{
-	id:1679179339846315605
-	TransactionId:0
-	Topic:rebouncer/inotify/outgoing/clobber
-	File:f3.txt
-	OccurredAt:2023-03-18 18:56:25.787518001 -0400 EDT m=+845.941275029
-	Operation:notify.InCloseWrite
-}
-
-event: rebouncer/fs/output
-data: {"file": "index.html", "operation": "modify"}
-
-event: rebouncer/fs/output
-data: {"file": "css/debug.css", "operation": "delete"}
-
-event: rebouncer/fs/output
-data: {"file": "css/mobile", "operation": "create"}
-
-event: rebouncer/fs/output
-data: {"file": "css/mobile", "operation": "modify"}
-
-*/
-
 type fsEvent struct {
 	File      string `json:"file"`
 	Operation string `json:"operation"`
