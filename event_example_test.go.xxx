@@ -13,7 +13,7 @@ func ExampleNewNiceEvent() {
 	fmt.Println(e)
 }
 
-// Using NewNiceEvent in an Injestor
+// Using NewNiceEvent in an Ingestor
 func ExampleInjestor() {
 
 	var returnChannel = make(chan rebouncer.NiceEvent)

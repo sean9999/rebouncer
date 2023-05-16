@@ -1,23 +1,12 @@
 package rebouncer
 
-import (
-	"time"
-)
+// QuantizeFunction operates on a Queue and decides whether or not to flush it to the consumer
+type QuantizeFunction[T any] func(chan<- bool, []NiceEvent[T])
 
-// Quantizer runs in a go routine and sends true to readyChannel when it decides we're ready to Emit()
+// Quantizer runs in a go routine and sends true to readyChannel when it decides we're ready to emit()
 // it has access to the entire batch in the Queue to help make this decision.
-type Quantizer func(chan bool, *[]NiceEvent)
+//type Quantizer[T any] func(chan bool, *[]NiceEvent[T])
 
-// simply waits ms milliseconds and then sends true, causing Emit() to run, sending NiceEvents back to the consumer
-// this would be the most common and straightforward pattern for filesystem watchers
-func DefaultInotifyQuantizer(ms int) Quantizer {
-	ticker := time.NewTicker(time.Minute)
-	qFunc := func(readyChan chan bool, em *[]NiceEvent) {
-		ticker.Reset(time.Duration(ms) * time.Millisecond)
-		for range ticker.C {
-			ready := (len(*em) > 0)
-			readyChan <- ready
-		}
-	}
-	return qFunc
+func (m *machine[T]) quantize() {
+	m.readyChannel <- false
 }
