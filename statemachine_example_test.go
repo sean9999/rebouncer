@@ -17,7 +17,7 @@ func ExampleNew() {
 		BufferSize: rebouncer.DefaultBufferSize,
 		Quantizer:  rebouncer.DefaultInotifyQuantizer(interval),
 		Reducer:    rebouncer.DefaultInotifyReduce,
-		Injestor:   rebouncer.DefaultInotifyInjestor(watchDir, rebouncer.DefaultBufferSize),
+		ingestor:   rebouncer.DefaultInotifyingestor(watchDir, rebouncer.DefaultBufferSize),
 	})
 
 	//	here is the channel we can listen on

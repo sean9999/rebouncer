@@ -22,7 +22,7 @@ type StateMachine interface {
 type userFunctions struct {
 	quantizer Quantizer
 	reducer   Reducer
-	injestor  Injestor
+	ingestor  ingestor
 }
 
 // pointer to machinery implements StateMachine
@@ -40,7 +40,7 @@ type Config struct {
 	BufferSize int
 	Quantizer  Quantizer
 	Reducer    Reducer
-	Injestor   Injestor
+	ingestor   ingestor
 }
 
 // The canonical way to create a new StateMachine
@@ -54,13 +54,13 @@ func New(config Config) StateMachine {
 		user: userFunctions{
 			quantizer: config.Quantizer,
 			reducer:   config.Reducer,
-			injestor:  config.Injestor,
+			ingestor:  config.ingestor,
 		},
 	}
 
-	incomingEvents := m.user.injestor()
+	incomingEvents := m.user.ingestor()
 
-	//	listen to events emitted by Injestor
+	//	listen to events emitted by ingestor
 	go func() {
 		for inEvent := range incomingEvents {
 			m.Push(inEvent)
@@ -104,7 +104,7 @@ func (m *machinery) Push(newEvent NiceEvent) {
 	go m.Quantize(m.readyChan, &m.Queue)
 }
 
-// Quantize runs after Injest() and decides whether or not to call Emit()
+// Quantize runs after ingest() and decides whether or not to call Emit()
 func (m *machinery) Quantize(readyChannel chan bool, em *[]NiceEvent) {
 	fn := m.user.quantizer
 	go fn(readyChannel, em)

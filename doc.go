@@ -18,7 +18,7 @@ To use it as a library, but again employing it as an inotify-backed filewatcher:
 
 Although Rebouncer provides convenience functions for common cases (such as file-watcher using inotify), an understanding of its basic architecture is necessary for more advanced uses.
 
-  - an [Injestor] injests your source events, converting them into a format rebouncer can reason about, adding them to the queue
+  - an [ingestor] ingests your source events, converting them into a format rebouncer can reason about, adding them to the queue
   - a [Reducer] operates on the entire queue of events, discarding, modifying, or even adding new ones at will
   - a [Quantizer] is initialized at startup and runs directly after the reducer, deciding where it's time to Emit()
   - an [Egestor] that formats the output. It is simply a function that takes a [NiceEvent] and returns an AnyEvent

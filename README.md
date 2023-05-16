@@ -1,7 +1,5 @@
 # Rebouncer
 
-[![Conventional Commits](https://img.shields.io/badge/Conventional%20Commits-1.0.0-%23FE5196?logo=conventionalcommits&logoColor=white)](https://conventionalcommits.org)
-
 [![Maintenance](https://img.shields.io/badge/Maintained%3F-yes-green.svg)](https://github.com/sean9999/rebouncer/graphs/commit-activity)
 
 [![Go Reference](https://pkg.go.dev/badge/github.com/sean9999/rebouncer.svg)](https://pkg.go.dev/github.com/sean9999/rebouncer)
@@ -53,13 +51,13 @@ You may want more flexibility than that. Rebouncer can be invoked as a library, 
 
 Rebouncer needs a few basic to be passed in. Continuing the example a file-watcher, let's go over the basic architecture of these plugin lifecycle functions:
 
-### Injestor
+### ingestor
 
-An injestor is defined as runs in a go routine, and sends events of interest to Rebouncer, pushing them onto the Queue. It looks like this:
+An ingestor is defined as runs in a go routine, and sends events of interest to Rebouncer, pushing them onto the Queue. It looks like this:
 
 ### Reducer
 
-Reducer operates on the entire Queue, each time Injestor runs, modifiying, removing, or even adding events as needed.
+Reducer operates on the entire Queue, each time ingestor runs, modifiying, removing, or even adding events as needed.
 
 ### Quantizer
 
@@ -91,9 +89,9 @@ stateMachine := rebouncer.New(rebouncer.Config{
 	BufferSize: rebouncer.DefaultBufferSize,
 	Quantizer:  rebouncer.DefaultInotifyQuantizer(1000),
 	Reducer:    rebouncer.DefaultInotifyReduce,
-	Injestor:   rebouncer.DefaultInotifyInjestor("./build", rebouncer.DefaultBufferSize),
+	ingestor:   rebouncer.DefaultInotifyingestor("./build", rebouncer.DefaultBufferSize),
 })
 
 ```
 
-`DefaultInotifyQuantizer()`, `DefaultInotifyReduce()`, and `DefaultInotifyInjestor()` are all themselves convenience functions that alleviate you from having to write your own respective Quantizer, Reducer, and Injestor.
+`DefaultInotifyQuantizer()`, `DefaultInotifyReduce()`, and `DefaultInotifyingestor()` are all themselves convenience functions that alleviate you from having to write your own respective Quantizer, Reducer, and ingestor.

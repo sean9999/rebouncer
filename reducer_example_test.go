@@ -23,7 +23,7 @@ func ExampleReducer() {
 		return outEvents
 	}
 
-	// Reducers (as well as Injestors and Quantizers) are injected at instantiation time
+	// Reducers (as well as ingestors and Quantizers) are injected at instantiation time
 	conf := rebouncer.Config{
 		Reducer: omitCss,
 	}

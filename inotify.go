@@ -82,7 +82,7 @@ func NewInotify(dir string, bouncePeriod int) StateMachine {
 		BufferSize: DefaultBufferSize,
 		Quantizer:  DefaultInotifyQuantizer(bouncePeriod),
 		Reducer:    DefaultInotifyReduce,
-		Injestor:   DefaultInotifyInjestor(dir, DefaultBufferSize),
+		ingestor:   DefaultInotifyingestor(dir, DefaultBufferSize),
 	})
 	go rebel.WatchDir(dir)
 	return rebel

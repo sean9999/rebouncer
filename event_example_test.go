@@ -13,12 +13,12 @@ func ExampleNewNiceEvent() {
 	fmt.Println(e)
 }
 
-// Using NewNiceEvent in an Injestor
-func ExampleInjestor() {
+// Using NewNiceEvent in an ingestor
+func Exampleingestor() {
 
 	var returnChannel = make(chan rebouncer.NiceEvent)
 
-	injestFunc := func() chan rebouncer.NiceEvent {
+	ingestFunc := func() chan rebouncer.NiceEvent {
 
 		nTicks := 0
 		ticker := time.NewTicker(500 * time.Millisecond)
@@ -41,7 +41,7 @@ func ExampleInjestor() {
 	}
 
 	config := rebouncer.Config{
-		Injestor: injestFunc,
+		ingestor: ingestFunc,
 	}
 	stateMachine := rebouncer.New(config)
 
