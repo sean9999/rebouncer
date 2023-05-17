@@ -2,12 +2,12 @@
     "version": "0.2.0",
     "configurations": [
         {
-            "name": "run on ./tmp/**",
+            "name": "run example inotify command",
             "type": "go",
             "request": "launch",
             "mode": "auto",
             "program": "${workspaceFolder}/cmd/rebounce/main.go",
-            "args": ["--dir", "${workspaceFolder}/tmp"]
+            "cwd": "${workspaceFolder}"
         }
     ]
 }

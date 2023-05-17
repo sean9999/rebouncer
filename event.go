@@ -6,41 +6,40 @@ import (
 	"time"
 )
 
-// an ever-incrementing id for NiceEvents
+// UniqueEventId is an ever-incrementing id for NiceEvents
 var UniqueEventId uint64 = uint64(time.Now().UnixNano())
 
 // NiceEvent is the common format expected and produced for all events
-type NiceEvent struct {
-	Id            uint64 // a unique (within this process) auto-incrementing ID
-	TransactionId uint32 // 0 if this is an atomic operation, some number of it's part of a transaction
-	Topic         string // a type of message (ex: "rebouncer/fs/inotify", or "rebouncer/fs/nice", or "rebouncer/lifecycle/shutdown")
-	File          string // the file being operated on. A path relative to *watchDir
-	OccurredAt    time.Time
-	Operation     string // ex: Create, Delete, Modify
+type NiceEvent[T any] struct {
+	Data  T // original data
+	Id    uint64
+	Topic string
 }
 
-// A quick check to determine of a NiceEvent is zeroed-out. Zeroed out events should be culled, but this doesn't necisarily represent an error condition.
-func (e NiceEvent) IsZeroed() bool {
-	return (e.Id == 0 && e.TransactionId == 0 && e.Topic == "")
-}
-
-// using atomic operations, get the next event id
-func NextEventId() uint64 {
+// NextEventId uses atomic operations to increment a [UniqueEventId]
+func nextEventId() uint64 {
 	atomic.AddUint64(&UniqueEventId, 1)
 	return atomic.LoadUint64(&UniqueEventId)
 }
 
-// the canonical way to create a new event, garuanteeing you have a unique id and proper timestamp
-func NewNiceEvent(topic string) NiceEvent {
-	e := NiceEvent{
-		Id:         NextEventId(),
-		Topic:      topic,
-		OccurredAt: time.Now(),
+// IsZeroed is a quick check to determine of a NiceEvent is zeroed-out.
+// Zeroed out events should be culled, but this doesn't necessarily represent an error condition.
+// Your business logic will depend on your needs
+func (e NiceEvent[T]) IsZeroed() bool {
+	return e.Id == 0 && e.Topic == ""
+}
+
+// NewNiceEvent is the canonical way to create a new event, guaranteeing you have a unique id and proper timestamp
+func NewNiceEvent[T any](originalEvent T, topic string) NiceEvent[T] {
+	e := NiceEvent[T]{
+		Id:    nextEventId(),
+		Topic: topic,
+		Data:  originalEvent,
 	}
 	return e
 }
 
-// a simple convenience function for debugging
-func (e NiceEvent) Dump() string {
-	return fmt.Sprintf("%+v", e)
+// Dump is a simple convenience function for debugging
+func (e NiceEvent[T]) Dump() string {
+	return fmt.Sprintf("NiceEvent: %+v", e)
 }

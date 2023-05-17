@@ -1,68 +1,162 @@
 package main
 
 import (
-	"encoding/json"
-	"flag"
 	"fmt"
+	"path/filepath"
+	"regexp"
+	"strings"
+	"time"
 
+	"github.com/rjeczalik/notify"
 	"github.com/sean9999/rebouncer"
+	"golang.org/x/sys/unix"
 )
 
-var watchDir *string
-var flushPeriod *int
-
-func init() {
-	//	parse options and arguments
-	//	@todo: sanity checking
-	watchDir = flag.String("dir", ".", "what directory to watch")
-	flushPeriod = flag.Int("period", 1000, "how often (in milliseconds) to flush events")
-	flag.Parse()
-}
-
-type fsEvent struct {
-	File      string `json:"file"`
-	Operation string `json:"operation"`
-}
-
-type SSEEvent struct {
-	Id    uint64  `json:"id"`
-	Event string  `json:"event"`
-	Data  fsEvent `json:"data"`
-}
-
-func (s SSEEvent) Serialize() string {
-	eventDataAsJson, err := json.Marshal(s.Data)
+// the string ends with a "~" character
+func endsInTilde(s string) bool {
+	pattern := `~$`
+	r, err := regexp.MatchString(pattern, s)
 	if err != nil {
 		panic(err)
 	}
-	output := fmt.Sprintf("event: %s\nid: %d\ndata: %s\n\n", s.Event, s.Id, eventDataAsJson)
-	return output
+	return r
 }
 
-func NiceEventToSSE(ne rebouncer.NiceEvent) SSEEvent {
-	inotifyEvent := fsEvent{
-		File:      ne.File,
-		Operation: ne.Operation,
+// the string is just numbers
+func containsOnlyNumbers(s string) bool {
+	pattern := `^\d+$`
+	r, err := regexp.MatchString(pattern, s)
+	if err != nil {
+		panic(err)
 	}
-	sseEvent := SSEEvent{
-		Id:    ne.Id,
-		Event: ne.Topic,
-		Data:  inotifyEvent,
-	}
-	return sseEvent
+	return r
 }
 
+func isTempFile(path string) bool {
+	return endsInTilde(path) && containsOnlyNumbers(path)
+}
+
+func InotifyToNice(ei notify.EventInfo, basePath string) rebouncer.NiceEvent[fsEvent] {
+	abs, _ := filepath.Abs(basePath)
+	normalFile := strings.TrimPrefix(ei.Path(), abs)
+	d := fsEvent{
+		File:          normalFile,
+		Operation:     ei.Event().String(),
+		TransactionId: ei.Sys().(*unix.InotifyEvent).Cookie,
+	}
+	r := rebouncer.NewNiceEvent[fsEvent](d, "rebouncer/inotify/example")
+	return r
+}
+
+type fsEvent struct {
+	File          string
+	Operation     string
+	TransactionId uint32
+}
+
+// Instantiating an inotify-backed file-watcher using the verbose method.
 func main() {
 
-	//	instantiate
-	niceEvents := rebouncer.NewInotify(*watchDir, *flushPeriod)
+	const WatchMask = notify.InModify |
+		notify.InCloseWrite |
+		notify.InMovedFrom |
+		notify.InMovedTo |
+		notify.InCreate |
+		notify.InDelete |
+		notify.InDeleteSelf |
+		notify.InMoveSelf
 
-	//	here is the channel we listen on
-	outgoingEvents := niceEvents.Subscribe()
+	interval, err := time.ParseDuration("1234ms") // how long to wait in between flushes, in milliseconds
+	if err != nil {
+		panic(err)
+	}
+	watchDir := "./build" // what directory to recursively watch for fileSystem events
 
-	//	output in SSE format
+	// function of type IngestorFunction
+	ingestInotifyEvents := func(inEvents chan<- rebouncer.NiceEvent[fsEvent]) {
+		//	dirty events
+		var fsEvents = make(chan notify.EventInfo, 1024)
+		err := notify.Watch(watchDir+"/...", fsEvents, WatchMask)
+		if err != nil {
+			panic(err)
+		}
+		// clean events
+		for dirtyEvent := range fsEvents {
+			cleanEvent := InotifyToNice(dirtyEvent, watchDir)
+			if !isTempFile(cleanEvent.Data.File) {
+				inEvents <- cleanEvent
+			}
+		}
+	}
+
+	//	function of type ReducerFunction
+	removeDuplicateInotifyEvents := func(inEvents []rebouncer.NiceEvent[fsEvent]) []rebouncer.NiceEvent[fsEvent] {
+		// folding our slice into a map and then back into a slice is a convenient way to normalize
+		// because we are using FileName as key
+		batchMap := map[string]rebouncer.NiceEvent[fsEvent]{}
+		normalizedEvents := []rebouncer.NiceEvent[fsEvent]{}
+		//	fill batchMap
+		for _, newEvent := range inEvents {
+			fileName := newEvent.Data.File
+			oldEvent, existsInMap := batchMap[fileName]
+			//	only process non-temp files and valid events
+			//if !isTempFile(fileName) && !newEvent.IsZeroed() {
+			if existsInMap {
+				switch {
+				case oldEvent.Data.Operation == "notify.Create" && newEvent.Data.Operation == "notify.Remove":
+					//	a Create followed by a Remove means nothing of significance happened. Purge the record
+					delete(batchMap, fileName)
+				default:
+					//	the default case should be to overwrite the record
+					newEvent.Topic = "rebouncer/inotify/outgoing/clobber"
+					batchMap[fileName] = newEvent
+				}
+			} else {
+				newEvent.Topic = "rebouncer/inotify/outgoing/virginal"
+				batchMap[newEvent.Data.File] = newEvent
+			}
+			//}
+		}
+		//	unwind batchMap
+		for _, e := range batchMap {
+			normalizedEvents = append(normalizedEvents, e)
+		}
+		return normalizedEvents
+	}
+
+	//	periodicallyFlushQueue immediately writes `true` to readyChan
+	//	if there is anything at all in the queue
+	//	if there isn't, it sleeps and then sends `false`, which triggers another run
+	periodicallyFlushQueue := func(readyChan chan<- bool, queue []rebouncer.NiceEvent[fsEvent]) {
+		if len(queue) > 0 {
+			readyChan <- true
+		} else {
+			time.Sleep(interval)
+			readyChan <- false
+		}
+	}
+
+	conf := rebouncer.Config[fsEvent]{
+		BufferSize: 1024,
+		Ingestor:   ingestInotifyEvents,
+		Reducer:    removeDuplicateInotifyEvents,
+		Quantizer:  periodicallyFlushQueue,
+	}
+
+	//	rebecca is our singleton instance
+	rebecca, err := rebouncer.New(conf)
+	if err != nil {
+		panic(err)
+	}
+
+	//fmt.Println(rebecca)
+
+	//	here is the channel we can listen on
+	outgoingEvents := rebecca.Subscribe()
+
+	//	for example
 	for e := range outgoingEvents {
-		fmt.Printf("%s", NiceEventToSSE(e).Serialize())
+		fmt.Println(e.Dump())
 	}
 
 }

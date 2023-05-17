@@ -1,5 +1,5 @@
 /*
-Rebouncer is a generic library takes a noisy source of events, and produces a cleaner source.
+Package rebouncer is a generic library that takes a noisy source of events, and produces a calmer, fitter, and healthier source.
 
 It employs a plugin architecture that can allow it to be used flexibly whenever the fan-out-fan-in concurrency pattern is needed.
 
@@ -18,9 +18,9 @@ To use it as a library, but again employing it as an inotify-backed filewatcher:
 
 Although Rebouncer provides convenience functions for common cases (such as file-watcher using inotify), an understanding of its basic architecture is necessary for more advanced uses.
 
-  - an [Injestor] injests your source events, converting them into a format rebouncer can reason about, adding them to the queue
+  - an [Ingestor] injests your source events, converting them into a format rebouncer can reason about, adding them to the queue
   - a [Reducer] operates on the entire queue of events, discarding, modifying, or even adding new ones at will
-  - a [Quantizer] is initialized at startup and runs directly after the reducer, deciding where it's time to Emit()
+  - a [Quantizer] is initialized at startup and runs directly after the reducer, deciding where it's time to emit()
   - an [Egestor] that formats the output. It is simply a function that takes a [NiceEvent] and returns an AnyEvent
 */
 package rebouncer

@@ -11,4 +11,5 @@ vendor/
 *.log
 tmp/
 publish.sh
-
+build/
+tmp/
