@@ -4,12 +4,9 @@
 *.so
 *.dylib
 *.test
-tmp/
 *.out
 *.log
-vendor/
-*.log
-tmp/
 publish.sh
-build/
+vendor/
 tmp/
+build/

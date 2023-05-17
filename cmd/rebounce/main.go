@@ -1,6 +1,7 @@
 package main
 
 import (
+	"flag"
 	"fmt"
 	"path/filepath"
 	"regexp"
@@ -54,6 +55,13 @@ type fsEvent struct {
 	TransactionId uint32
 }
 
+// command-line flags
+var WatchDir = flag.String("dir", "./build", "what directory to watch")
+
+func init() {
+	flag.Parse()
+}
+
 // Instantiating an inotify-backed file-watcher using the verbose method.
 func main() {
 
@@ -70,19 +78,18 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
-	watchDir := "./build" // what directory to recursively watch for fileSystem events
 
 	// function of type IngestorFunction
 	ingestInotifyEvents := func(inEvents chan<- rebouncer.NiceEvent[fsEvent]) {
 		//	dirty events
 		var fsEvents = make(chan notify.EventInfo, 1024)
-		err := notify.Watch(watchDir+"/...", fsEvents, WatchMask)
+		err := notify.Watch(*WatchDir+"/...", fsEvents, WatchMask)
 		if err != nil {
 			panic(err)
 		}
 		// clean events
 		for dirtyEvent := range fsEvents {
-			cleanEvent := InotifyToNice(dirtyEvent, watchDir)
+			cleanEvent := InotifyToNice(dirtyEvent, *WatchDir)
 			if !isTempFile(cleanEvent.Data.File) {
 				inEvents <- cleanEvent
 			}

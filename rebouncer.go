@@ -1,5 +1,9 @@
 package rebouncer
 
+// all channels have this capacity
+const DefaultBufferSize = 1024
+
+// Subscribe() is the only method we need
 type Behaviour[T any] interface {
 	Subscribe() <-chan NiceEvent[T]     // returns a channel and pushes events to it
 	emit()                              // flushes the Queue
