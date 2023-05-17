@@ -1,13 +1,10 @@
 package rebouncer_test
 
 import (
-	"fmt"
-	"time"
-
-	"github.com/sean9999/rebouncer"
 	"github.com/rjeczalik/notify"
+	"github.com/sean9999/rebouncer"
+	"golang.org/x/sys/unix"
 )
-
 
 // Using NewNiceEvent in an Ingestor
 func ExampleIngestFunction() {
@@ -18,24 +15,23 @@ func ExampleIngestFunction() {
 		Operation     string
 		TransactionId uint32
 	}
-	
+
 	//	this function converts from messy notify.EventInfo to our lovely fsEvent
 	InotifyToNice := func(ei notify.EventInfo) rebouncer.NiceEvent[fsEvent] {
 		d := fsEvent{
-				File:          ei.Path(),
-				Operation:     ei.Event().String(),
-				TransactionId: ei.Sys().(*unix.InotifyEvent).Cookie,
+			File:          ei.Path(),
+			Operation:     ei.Event().String(),
+			TransactionId: ei.Sys().(*unix.InotifyEvent).Cookie,
 		}
-		r := rebouncer.NewNiceEvent[fsEvent](d, "inotify/example")
+		r := rebouncer.NewNiceEvent[fsEvent](d, "inotify/ingest")
 		return r
 	}
-	
-	
+
 	//	our IngestFunction could look like this
-	ingestInotifyEvents := func(inEvents chan<- rebouncer.NiceEvent[fsEvent]) {
+	_ = func(inEvents chan<- rebouncer.NiceEvent[fsEvent]) {
 		//	dirty events
 		var fsEvents = make(chan notify.EventInfo, 1024)
-		err := notify.Watch("/var/log/...", fsEvents, WatchMask)
+		err := notify.Watch("/var/log/...", fsEvents)
 		if err != nil {
 			panic(err)
 		}
@@ -45,6 +41,6 @@ func ExampleIngestFunction() {
 			//	inEvents represents the Queue
 			inEvents <- cleanEvent
 		}
-	}	
-	
+	}
+
 }
