@@ -1,12 +1,8 @@
 package rebouncer
 
-// QuantizeFunction operates on a Queue and decides whether or not to flush it to the consumer
+// QuantizeFunction operates on a (read-only) Queue [machine.readyChannel] is written to with a value of false
+// It _writes_ to readyChannel when it wants to run itself again or wants to signal that it's time to emit()
+//
+// Do NOT use a time.Ticker inside your Quantizer
+// Periodicity is achieved by waiting and then writing `false` to readyChannel
 type QuantizeFunction[T any] func(chan<- bool, []NiceEvent[T])
-
-// Quantizer runs in a go routine and sends true to readyChannel when it decides we're ready to emit()
-// it has access to the entire batch in the Queue to help make this decision.
-//type Quantizer[T any] func(chan bool, *[]NiceEvent[T])
-
-func (m *machine[T]) quantize() {
-	m.readyChannel <- false
-}

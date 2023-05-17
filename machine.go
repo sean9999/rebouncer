@@ -1,7 +1,6 @@
 package rebouncer
 
 import (
-	"fmt"
 	"sync"
 )
 
@@ -40,30 +39,22 @@ func New[T any](config Config[T]) (Behaviour[T], error) {
 		ingestor:       config.Ingestor,
 	}
 
-	//	incomingEvents is a channel that is being pushed to by [IngestFunction]
+	//	Ingest
 	incomingEvents, err := m.ingest()
 	if err != nil {
 		return nil, err
 	}
 
-	//	readyChan is a channel that [QuantizeFunction] writes true to when it's time to [emit]
-	//	emit() will transfer NiceEvents from Queue to outgoingEvents
-	//m.readyChannel = m.quantize()
-
-	//	listen to events emitted by Ingestor
+	//	Reduce
 	go func() {
 		for inEvent := range incomingEvents {
 			m.reduce(inEvent)
 		}
 	}()
 
-	//	send one value to readyChan to get the ball rolling
-	go m.quantize()
-
-	//	keep the ball rolling
+	//	Quantize
 	go func() {
 		for isReady := range m.readyChannel {
-			fmt.Printf("isReady is %v\n", isReady)
 			if isReady {
 				m.emit()
 			} else {
@@ -71,6 +62,9 @@ func New[T any](config Config[T]) (Behaviour[T], error) {
 			}
 		}
 	}()
+
+	//	kick-off quantization
+	m.readyChannel <- false
 
 	return &m, nil
 }
@@ -88,15 +82,13 @@ func (m *machine[T]) writeQueue(eventSlice []NiceEvent[T]) error {
 
 // Emit all queued NiceEvents to OutgoingEvents
 func (m *machine[T]) emit() {
-	//m.mu.Lock()
-
-	fmt.Println("emit()")
-
+	m.mu.Lock()
 	for _, e := range m.Queue {
 		m.outgoingEvents <- e
 	}
 	m.Queue = []NiceEvent[T]{}
-	//m.mu.Unlock()
+	m.mu.Unlock()
+	m.readyChannel <- false
 }
 
 // Subscribe gives us our final, curated channel of NiceEvents

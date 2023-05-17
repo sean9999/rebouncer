@@ -66,12 +66,13 @@ func main() {
 		notify.InDeleteSelf |
 		notify.InMoveSelf
 
-	interval, err := time.ParseDuration("1001ms") // how long to wait in between flushes, in milliseconds
+	interval, err := time.ParseDuration("1234ms") // how long to wait in between flushes, in milliseconds
 	if err != nil {
 		panic(err)
 	}
 	watchDir := "./build" // what directory to recursively watch for fileSystem events
 
+	// function of type IngestorFunction
 	ingestInotifyEvents := func(inEvents chan<- rebouncer.NiceEvent[fsEvent]) {
 		//	dirty events
 		var fsEvents = make(chan notify.EventInfo, 1024)
@@ -88,6 +89,7 @@ func main() {
 		}
 	}
 
+	//	function of type ReducerFunction
 	removeDuplicateInotifyEvents := func(inEvents []rebouncer.NiceEvent[fsEvent]) []rebouncer.NiceEvent[fsEvent] {
 		// folding our slice into a map and then back into a slice is a convenient way to normalize
 		// because we are using FileName as key
@@ -119,20 +121,18 @@ func main() {
 		for _, e := range batchMap {
 			normalizedEvents = append(normalizedEvents, e)
 		}
-
 		return normalizedEvents
 	}
 
+	//	periodicallyFlushQueue immediately writes `true` to readyChan
+	//	if there is anything at all in the queue
+	//	if there isn't, it sleeps and then sends `false`, which triggers another run
 	periodicallyFlushQueue := func(readyChan chan<- bool, queue []rebouncer.NiceEvent[fsEvent]) {
-		period := time.NewTicker(interval)
-		for range period.C {
-			queueLength := len(queue)
-			fmt.Println("queueLength", queueLength)
-			if queueLength > 0 {
-				readyChan <- true
-			} else {
-				readyChan <- false
-			}
+		if len(queue) > 0 {
+			readyChan <- true
+		} else {
+			time.Sleep(interval)
+			readyChan <- false
 		}
 	}
 
@@ -156,7 +156,7 @@ func main() {
 
 	//	for example
 	for e := range outgoingEvents {
-		fmt.Println("REBOUNCER", e.Dump())
+		fmt.Println(e.Dump())
 	}
 
 }

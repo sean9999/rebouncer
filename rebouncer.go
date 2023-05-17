@@ -6,6 +6,6 @@ type Behaviour[T any] interface {
 	readQueue() []NiceEvent[T]          // gets the Queue, with safety and locking
 	writeQueue([]NiceEvent[T]) error    // sets the Queue, handling safety and locking
 	ingest() (chan NiceEvent[T], error) // returns and operates on a channel
-	quantize()                          // decides whether the flush the Queue
-	reduce(NiceEvent[T])                // removes unwanted NiceEvents from the Queue
+	//quantize()                          // decides whether the flush the Queue
+	reduce(NiceEvent[T]) // removes unwanted NiceEvents from the Queue
 }
