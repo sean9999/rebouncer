@@ -18,7 +18,7 @@ type machine[T any] struct {
 
 // Config contains everything you need to pass to the New() constructor
 type Config[T any] struct {
-	BufferSize int
+	BufferSize int // maximum number of events that can pile up on the queue
 	Ingestor   IngestFunction[T]
 	Reducer    ReduceFunction[T]
 	Quantizer  QuantizeFunction[T]
