@@ -10,4 +10,5 @@ func (m *stateMachine[NAUGHTY, NICE, BEAUTIFUL]) emit(fn EmitFunction[NICE, BEAU
 		//	@todo: provide a way to drain events one by one
 	}
 	m.writeQueue([]NICE{})
+	m.readyChannel <- false // restart quantizer
 }

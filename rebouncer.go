@@ -10,7 +10,6 @@ type Behaviour[NAUGHTY any, NICE any, BEAUTIFUL any] interface {
 	readQueue() []NICE                  // gets the Queue, with safety and locking
 	writeQueue([]NICE)                  // sets the Queue, handling safety and locking
 	ingest(IngestFunction[NAUGHTY, NICE])
-	stopIngesting() error
 	quantize(QuantizeFunction[NICE])   // decides whether the flush the Queue
 	reduce(ReduceFunction[NICE], NICE) // removes unwanted NiceEvents from the Queue
 }
@@ -23,6 +22,7 @@ func NewRebouncer[NAUGHTY any, NICE any, BEAUTIFUL any](
 	bufferSize int,
 ) Behaviour[NAUGHTY, NICE, BEAUTIFUL] {
 
+	//	channels
 	m := stateMachine[NAUGHTY, NICE, BEAUTIFUL]{
 		readyChannel:   make(chan bool),
 		incomingEvents: make(chan NICE, bufferSize),
@@ -31,22 +31,21 @@ func NewRebouncer[NAUGHTY any, NICE any, BEAUTIFUL any](
 
 	//	core functionality
 	go func() {
-		m.ingest(ingestFunc)
-		m.readyChannel <- false
 		for {
 			select {
 			case niceEvent := <-m.incomingEvents:
-				m.reduce(reduceFunc, niceEvent)
+				m.reduce(reduceFunc, niceEvent) // for every event pushed to the queue, run reducer
 			case isReady := <-m.readyChannel:
 				if isReady {
 					m.emit(emitFunc)
-					m.readyChannel <- false
 				} else {
 					m.quantize(quantizeFunc)
 				}
 			}
 		}
 	}()
+	go m.ingest(ingestFunc) // start ingesting
+	m.readyChannel <- false // start quantizer
 
 	return &m
 

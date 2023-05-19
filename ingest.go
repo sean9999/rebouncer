@@ -11,10 +11,3 @@ type IngestFunction[NAUGHTY any, NICE any] func(chan<- NICE)
 func (m *stateMachine[NAUGHTY, NICE, BEAUTIFUL]) ingest(fn IngestFunction[NAUGHTY, NICE]) {
 	go fn(m.incomingEvents)
 }
-
-/*
-func (m *stateMachine[NAUGHTY, NICE, BEAUTIFUL]) stopIngesting() error {
-	close(m.incomingEvents)
-	return nil
-}
-*/
