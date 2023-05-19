@@ -6,4 +6,8 @@ package rebouncer
 //
 // A value of `false` sent to readyChannel triggers another run of QuantizeFunction.
 // A value of `true` triggers emit()
-type QuantizeFunction[T any] func(chan<- bool, []NiceEvent[T])
+type QuantizeFunction[NICE any] func(chan<- bool, Queue[NICE])
+
+func (m *stateMachine[NAUGHTY, NICE, BEAUTIFUL]) quantize(fn QuantizeFunction[NICE]) {
+	go fn(m.readyChannel, m.readQueue())
+}
