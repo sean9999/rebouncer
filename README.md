@@ -18,38 +18,8 @@ Rebouncer is a generic library that takes a noisy source of events, and produces
 
 It employes a plugin architecture that can allow it to be used flexibly whenever the fan-out/fan-in concurrency pattern is needed.
 
-The canonical case is a file-watcher that discards events involving temp files and other artefacts, providing its consumer with a clean, sane, and curated source of events. It is the engine behind [Fasthak](https://www.seanmacdonald.ca/posts/fasthak/).
-
-For the canonical case, rebouncer is also available as a binary. It takes a directory as an argument, producing SSE events to stdout.
-
-## Using it as a binary
-
-This simplest case is accomplished like so:
-
-```sh
-$ go install github.com/sean9999/rebouncer/cmd
-$ rebouncer -dir ~/projects/myapp/build
-```
-
-Which might stream to stdout something that looks like this:
-
-<pre>
-<samp>event: rebouncer/fs/output
-data: {"file": "index.html", "operation": "modify"}
-
-event: rebouncer/fs/output
-data: {"file": "css/debug.css", "operation": "delete"}
-
-event: rebouncer/fs/output
-data: {"file": "css/mobile", "operation": "create"}
-
-event: rebouncer/fs/output
-data: {"file": "css/mobile", "operation": "modify"}</samp>
-</pre>
 
 ## Using it as a library
-
-You may want more flexibility than that. Rebouncer can be invoked as a library, allowing you to embed it in your application and giving you fine-grained control.
 
 Rebouncer needs a few basic to be passed in. Continuing the example a file-watcher, let's go over the basic architecture of these plugin lifecycle functions:
 

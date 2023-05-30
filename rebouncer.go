@@ -34,13 +34,17 @@ func NewRebouncer[NAUGHTY any, NICE any, BEAUTIFUL any](
 		for {
 			select {
 			case niceEvent := <-m.incomingEvents:
+				//m.Lock()
 				m.reduce(reduceFunc, niceEvent) // for every event pushed to the queue, run reducer
+				//m.Unlock()
 			case isReady := <-m.readyChannel:
+				//m.Lock()
 				if isReady {
 					m.emit(emitFunc)
 				} else {
 					m.quantize(quantizeFunc)
 				}
+				//m.Unlock()
 			}
 		}
 	}()
