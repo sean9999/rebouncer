@@ -6,8 +6,8 @@ package rebouncer
 //
 // An IngestFunction can only push new NiceEvents to the queue. It doesn't know what's already there.
 // Ingest is the first lifecycle event. It will be followed by [ReduceFunction]
-type IngestFunction[NAUGHTY any, NICE any] func(chan<- NICE)
+type IngestFunction[NAUGHTY any, NICE any] func(chan<- NICE, chan bool)
 
 func (m *stateMachine[NAUGHTY, NICE, BEAUTIFUL]) ingest(fn IngestFunction[NAUGHTY, NICE]) {
-	go fn(m.incomingEvents)
+	go fn(m.incomingEvents, m.doneChannel)
 }

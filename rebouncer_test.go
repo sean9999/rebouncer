@@ -32,7 +32,7 @@ func TestNewRebouncer(t *testing.T) {
 
 	// eat up random cards from a random-card source
 	// group them into hands of five and push those hands to the queue
-	ingestCards := func(q chan<- niceEvent) {
+	ingestCards := func(q chan<- niceEvent, doneChan chan bool) {
 		done := make(chan bool)
 		cardsChan := french.StreamCards(randy, done)
 		cardsBuffer := make([]easypoker.Card, 0, 5)
@@ -57,6 +57,7 @@ func TestNewRebouncer(t *testing.T) {
 				done <- true
 			}
 		}
+		doneChan <- true
 	}
 
 	//	we're not interested in low hands

@@ -23,7 +23,7 @@ It employes a plugin architecture that can allow it to be used flexibly whenever
 
 Rebouncer needs a few basic to be passed in. Continuing the example a file-watcher, let's go over the basic architecture of these plugin lifecycle functions:
 
-### Injestor
+### Ingestor
 
 An injestor is defined as runs in a go routine, and sends events of interest to Rebouncer, pushing them onto the Queue. It looks like this:
 

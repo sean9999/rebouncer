@@ -1,5 +1,7 @@
 package rebouncer
 
+import "fmt"
+
 // all channels have this capacity
 const DefaultBufferSize = 1024
 
@@ -25,6 +27,7 @@ func NewRebouncer[NAUGHTY any, NICE any, BEAUTIFUL any](
 	//	channels
 	m := stateMachine[NAUGHTY, NICE, BEAUTIFUL]{
 		readyChannel:   make(chan bool),
+		doneChannel:    make(chan bool),
 		incomingEvents: make(chan NICE, bufferSize),
 		outgoingEvents: make(chan BEAUTIFUL, bufferSize),
 	}
@@ -45,6 +48,10 @@ func NewRebouncer[NAUGHTY any, NICE any, BEAUTIFUL any](
 					m.quantize(quantizeFunc)
 				}
 				//m.Unlock()
+			case doneVal := <-m.doneChannel:
+				fmt.Println("all done", doneVal)
+				m.incomingEvents = nil
+				close(m.outgoingEvents)
 			}
 		}
 	}()

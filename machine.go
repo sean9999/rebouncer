@@ -9,6 +9,7 @@ type stateMachine[NAUGHTY any, NICE any, BEAUTIFUL any] struct {
 	//config         Config
 	//user           UserDefinedFunctionSet[NAUGHTY, NICE, BEAUTIFUL]
 	readyChannel   chan bool
+	doneChannel    chan bool
 	incomingEvents chan NICE
 	outgoingEvents chan BEAUTIFUL
 	queue          Queue[NICE]
