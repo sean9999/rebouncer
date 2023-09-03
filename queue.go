@@ -2,20 +2,22 @@ package rebouncer
 
 type Queue[NICE any] []NICE
 
-func (m *stateMachine[NAUGHTY, NICE, BEAUTIFUL]) Lock() {
+func (m *stateMachine[NICE]) Lock() {
 	m.mu.Lock()
 }
 
-func (m *stateMachine[NAUGHTY, NICE, BEAUTIFUL]) Unlock() {
+func (m *stateMachine[NICE]) Unlock() {
 	m.mu.Lock()
 }
 
-func (m *stateMachine[NAUGHTY, NICE, BEAUTIFUL]) writeQueue(newQueue []NICE) {
+func (m *stateMachine[NICE]) writeQueue(newQueue []NICE) {
 	//m.mu.Lock()
+	//defer m.mu.Unlock()
 	m.queue = newQueue
-	//m.mu.Unlock()
 }
 
-func (m *stateMachine[NAUGHTY, NICE, BEAUTIFUL]) readQueue() []NICE {
+func (m *stateMachine[NICE]) readQueue() []NICE {
+	//m.mu.Lock()
+	//defer m.mu.Unlock()
 	return m.queue
 }

@@ -8,6 +8,11 @@ package rebouncer
 // A value of `true` triggers emit()
 type QuantizeFunction[NICE any] func(chan<- bool, []NICE)
 
-func (m *stateMachine[NAUGHTY, NICE, BEAUTIFUL]) quantize(fn QuantizeFunction[NICE]) {
-	go fn(m.readyChannel, m.readQueue())
+func (m *stateMachine[NICE]) quantize(fn QuantizeFunction[NICE]) {
+	if m.lifeCycleState < Draining {
+		m.lifeCycleState = Quantizing
+	}
+	if m.lifeCycleState < Drained {
+		go fn(m.readyChannel, m.readQueue())
+	}
 }

@@ -19,6 +19,7 @@ func TestNewRebouncer(t *testing.T) {
 	type niceEvent struct {
 		Cards easypoker.Cards
 		N     int64
+		Poker easypoker.PokerHand
 	}
 
 	//	final form for outputting
@@ -47,7 +48,7 @@ func TestNewRebouncer(t *testing.T) {
 			// group them into hands of five
 			if len(cardsBuffer) == 5 {
 				e := niceEvent{
-					cardsBuffer, n,
+					cardsBuffer, n, easypoker.HighestPokerHand(cardsBuffer),
 				}
 				q <- e
 				cardsBuffer = cardsBuffer[:0]
@@ -81,24 +82,18 @@ func TestNewRebouncer(t *testing.T) {
 		}
 	}
 
-	//	add [easypoker.PokerHand] info, because our consumer wants it
-	makeItPretty := func(e niceEvent) beautifulEvent {
-		p := easypoker.HighestPokerHand(e.Cards)
-		r := beautifulEvent{
-			Hand:      e.Cards,
-			PokerHand: p,
-			N:         e.N,
-		}
-		return r
+	//	emit doesn't need to do anything special
+	passThrough := func(e niceEvent) niceEvent {
+		return e
 	}
 
 	t.Run("create a rebouncer with three structs and no user-defined functions", func(t *testing.T) {
 
-		rebecca := rebouncer.NewRebouncer[naughtyEvent, niceEvent, beautifulEvent](
+		rebecca := rebouncer.NewRebouncer[niceEvent](
 			ingestCards,
 			removeLowHands,
 			pushItRealGood,
-			makeItPretty,
+			passThrough,
 			2048,
 		)
 

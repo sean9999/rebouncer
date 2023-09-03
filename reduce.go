@@ -5,18 +5,17 @@ package rebouncer
 // or modify existing ones. A [ReduceFunction] is the 2nd lifecycle event, after [IngestFunction] and before [QuantizeFunction]
 type ReduceFunction[NICE any] func([]NICE) []NICE
 
-func (m *stateMachine[NAUGHTY, NICE, BEAUTIFUL]) reduce(fn ReduceFunction[NICE], newEvent NICE) {
+func (m *stateMachine[NICE]) reduce(fn ReduceFunction[NICE], newEvent NICE) {
 	//	apply ReduceFunction to the queue with the new NICE event appended
 	//	write the result back to the queue
-	m.writeQueue(fn(append(m.readQueue(), newEvent)))
+	if m.lifeCycleState < Draining {
+		m.lifeCycleState = Reducing
+	} else {
+		if len(m.incomingEvents) == 0 {
+			close(m.incomingEvents)
+			m.incomingEvents = nil
+		}
+	}
+	newQueue := fn(append(m.readQueue(), newEvent))
+	m.writeQueue(newQueue)
 }
-
-/*
-func (m *machine[T]) reduce(newEvent NiceEvent[T]) {
-	// newEvent is added to the Queue. ReduceFunction operates on the resulting slice
-	oldQueue := m.readQueue()
-	newQueue := m.reducer(append(oldQueue, newEvent))
-
-	_ = m.writeQueue(newQueue)
-}
-*/
