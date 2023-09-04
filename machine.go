@@ -1,13 +1,14 @@
 package rebouncer
 
 import (
+	"fmt"
 	"sync"
 )
 
-type rebouncerLifecycleState int
+type lifeCycleState int
 
 const (
-	StartingUp rebouncerLifecycleState = iota
+	StartingUp lifeCycleState = iota
 	Running
 	Ingesting
 	Reducing
@@ -22,17 +23,29 @@ const (
 type stateMachine[NICE any] struct {
 	//config         Config
 	//user           UserDefinedFunctionSet[NAUGHTY, NICE, BEAUTIFUL]
-	readyChannel   chan bool
-	doneChannel    chan bool // to indicate we're done ingesting
+	lifeCycle      chan lifeCycleState
 	incomingEvents chan NICE
 	outgoingEvents chan NICE
 	queue          Queue[NICE]
-	lifeCycleState rebouncerLifecycleState
-	mu             sync.Mutex
+	mu             sync.RWMutex
+	lifeState      lifeCycleState
 }
 
-func (m *stateMachine[NICE]) Done() {
-	m.doneChannel <- true
+func (m *stateMachine[NICE]) SetLifeCycleState(s lifeCycleState) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.lifeState = s
+	fmt.Println(s)
+}
+
+func (m *stateMachine[NICE]) GetLifeCycleState() lifeCycleState {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	return m.lifeState
+}
+
+func (m *stateMachine[NICE]) Interrupt() {
+	m.lifeCycle <- Draining
 }
 
 func (m *stateMachine[NICE]) Subscribe() <-chan NICE {

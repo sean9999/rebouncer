@@ -5,26 +5,16 @@ import (
 	"math/rand"
 	"testing"
 
-	"github.com/sean9999/GoCards/deck/french"
+	frenchDeck "github.com/sean9999/GoCards/deck/french"
 	"github.com/sean9999/GoCards/game/easypoker"
 	"github.com/sean9999/rebouncer"
 )
 
 func TestNewRebouncer(t *testing.T) {
 
-	//	noisy source of cards
-	type naughtyEvent french.Card
-
-	//	semi-structured for for analyizing
-	type niceEvent struct {
-		Cards easypoker.Cards
-		N     int64
-		Poker easypoker.PokerHand
-	}
-
 	//	final form for outputting
-	type beautifulEvent struct {
-		Hand      easypoker.Cards
+	type pokerInfo struct {
+		Cards     easypoker.Cards
 		PokerHand easypoker.PokerHand
 		N         int64
 	}
@@ -33,37 +23,36 @@ func TestNewRebouncer(t *testing.T) {
 
 	// eat up random cards from a random-card source
 	// group them into hands of five and push those hands to the queue
-	ingestCards := func(q chan<- niceEvent, doneChan chan bool) {
+	ingestCards := func(q chan<- pokerInfo) {
 		done := make(chan bool)
-		cardsChan := french.StreamCards(randy, done)
+		cardsChan := frenchDeck.StreamCards(randy, done)
 		cardsBuffer := make([]easypoker.Card, 0, 5)
 		n := int64(0)
 		for c := range cardsChan {
 			n++
 			easyPokerCard, err := easypoker.CardFromFrench(c)
 			//	drop the Jokers
-			if err != nil {
+			if err == nil {
 				cardsBuffer = append(cardsBuffer, easyPokerCard)
 			}
 			// group them into hands of five
 			if len(cardsBuffer) == 5 {
-				e := niceEvent{
-					cardsBuffer, n, easypoker.HighestPokerHand(cardsBuffer),
+				e := pokerInfo{
+					cardsBuffer, easypoker.HighestPokerHand(cardsBuffer), n,
 				}
 				q <- e
 				cardsBuffer = cardsBuffer[:0]
 			}
 			// give up after 100_000 iterations
-			if n > 100_000 {
+			if n > int64(1000) {
 				done <- true
 			}
 		}
-		doneChan <- true
 	}
 
 	//	we're not interested in low hands
-	removeLowHands := func(queue []niceEvent) []niceEvent {
-		newQueue := make([]niceEvent, 0, len(queue))
+	removeLowHands := func(queue []pokerInfo) []pokerInfo {
+		newQueue := make([]pokerInfo, 0, len(queue))
 		for _, hand := range queue {
 			if easypoker.HighestPokerHand(hand.Cards).Grade >= easypoker.ThreeOfAKind {
 				newQueue = append(newQueue, hand)
@@ -76,25 +65,24 @@ func TestNewRebouncer(t *testing.T) {
 	//	if there's anything in the queue,
 	//	push it out
 	// type QuantizeFunction[NICE any] func(chan<- bool, Queue[NICE])
-	pushItRealGood := func(okchan chan<- bool, queue []niceEvent) {
-		if len(queue) > 0 {
-			okchan <- true
-		}
+	pushItRealGood := func(queue []pokerInfo) bool {
+		okToEmit := (len(queue) > 0)
+		return okToEmit
 	}
 
 	//	emit doesn't need to do anything special
-	passThrough := func(e niceEvent) niceEvent {
+	passThrough := func(e pokerInfo) pokerInfo {
 		return e
 	}
 
 	t.Run("create a rebouncer with three structs and no user-defined functions", func(t *testing.T) {
 
-		rebecca := rebouncer.NewRebouncer[niceEvent](
+		rebecca := rebouncer.NewRebouncer[pokerInfo](
 			ingestCards,
 			removeLowHands,
 			pushItRealGood,
 			passThrough,
-			2048,
+			1024,
 		)
 
 		for hand := range rebecca.Subscribe() {

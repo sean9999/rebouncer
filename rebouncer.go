@@ -1,7 +1,5 @@
 package rebouncer
 
-import "fmt"
-
 // all channels have this capacity
 const DefaultBufferSize = 1024
 
@@ -13,7 +11,7 @@ type Rebouncer[NICE any] interface {
 	ingest(IngestFunction[NICE])
 	quantize(QuantizeFunction[NICE])   // decides whether the flush the Queue
 	reduce(ReduceFunction[NICE], NICE) // removes unwanted NiceEvents from the Queue
-	Drain()
+	Interrupt()
 }
 
 func NewRebouncer[NICE any](
@@ -26,39 +24,39 @@ func NewRebouncer[NICE any](
 
 	//	channels
 	m := stateMachine[NICE]{
-		readyChannel:   make(chan bool), //	indicates we're ready to flush to client
-		doneChannel:    make(chan bool), //	indicates we're done consuming events and ready to drain
 		incomingEvents: make(chan NICE, bufferSize),
 		outgoingEvents: make(chan NICE, bufferSize),
+		lifeCycle:      make(chan lifeCycleState, 1),
 	}
 
-	m.lifeCycleState = Running
+	m.SetLifeCycleState(Running)
 
-	//	core functionality
+	//	ingest loop
 	go func() {
-		for m.lifeCycleState != Drained {
-			select {
-			case niceEvent := <-m.incomingEvents:
-				m.reduce(reduceFunc, niceEvent) // for every event pushed to the queue, run reducer
-			case isReady := <-m.readyChannel:
-				if isReady {
-					m.emit(emitFunc)
-				} else {
-					m.quantize(quantizeFunc)
-				}
-			case doneVal := <-m.doneChannel:
-				fmt.Println("all done just kidding", doneVal)
-				m.Drain()
-				/*
-					for _, niceEvent := range m.queue {
-						m.outgoingEvents <- emitFunc(niceEvent)
-					}
-				*/
+		for niceEvent := range m.incomingEvents {
+			m.reduce(reduceFunc, niceEvent)
+		}
+	}()
+
+	//	quantize loop
+	go func() {
+		for lifeEvent := range m.lifeCycle {
+			switch lifeEvent {
+			case Quantizing:
+				m.quantize(quantizeFunc)
+			case Emiting:
+				m.emit(emitFunc)
+			case Draining:
+				//close(m.incomingEvents)
+				m.SetLifeCycleState(Draining)
+			case Drained:
+				close(m.outgoingEvents)
 			}
 		}
 	}()
-	m.readyChannel <- false // start quantizer
-	m.ingest(ingestFunc)    // start ingesting
+
+	m.lifeCycle <- Quantizing // start quantizer
+	m.ingest(ingestFunc)
 
 	return &m
 

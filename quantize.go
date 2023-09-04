@@ -6,13 +6,19 @@ package rebouncer
 //
 // A value of `false` sent to readyChannel triggers another run of QuantizeFunction.
 // A value of `true` triggers emit()
-type QuantizeFunction[NICE any] func(chan<- bool, []NICE)
+type QuantizeFunction[NICE any] func([]NICE) bool
 
 func (m *stateMachine[NICE]) quantize(fn QuantizeFunction[NICE]) {
-	if m.lifeCycleState < Draining {
-		m.lifeCycleState = Quantizing
-	}
-	if m.lifeCycleState < Drained {
-		go fn(m.readyChannel, m.readQueue())
-	}
+	go func() {
+		readyToEmit := fn(m.readQueue())
+		if readyToEmit {
+			m.lifeCycle <- Emiting
+		} else {
+			if m.GetLifeCycleState() == Draining && len(m.outgoingEvents) == 0 && len(m.queue) == 0 {
+				m.lifeCycle <- Drained
+			} else {
+				m.lifeCycle <- Quantizing
+			}
+		}
+	}()
 }
