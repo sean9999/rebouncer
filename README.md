@@ -40,6 +40,7 @@ type Quantizer[NICE any] func([]NICE) bool
 Rebouncer is generic. The atomic unit "event" is whatever shape you need it to be. Just make sure that your ingestor, reducer, and quantizer all operate on the same type.
 
 ```go
+//	Example
 
 type myEvent struct {
 	id int
@@ -47,26 +48,39 @@ type myEvent struct {
 	timestamp time.Time
 }
 
+//	ingest events
 ingest := func(incoming<- myEvent) {
-
 	for ev := range mySourceOfEvents() {
 		incoming<-ev
 	} 
-
 }
 
+//	we're not interested in any event involving .DS_Store
 reduce := func(inEvents []myEvent) []myEvent {
 	outEvents := []myEvent{}
-
 	for ev := range inEvents {
-
+		if ev.name != ".DS_Store" {
+			outEvents = append(outEvents, ev)
+		}
 	}
-
 	return outEvents
 }
 
+//	flush the queue every second
+quantize := func(queue []myEvent) bool {
+	time.Sleep(time.Second)
+	if len(queue) > 0 {
+		return true
+	} else {
+		return false
+	}
+}
 
+re := rebouncer.NewRebouncer[myEvent](ingest, reduce, quantize, 1024)
+
+for ev := range re.Subscribe() {
+	fmt.Println(ev)
+}
 ```
-
 
 <img src="/docs/hand.jpg" width="450" />
