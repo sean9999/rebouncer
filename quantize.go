@@ -1,14 +1,14 @@
 package rebouncer
 
-// QuantizeFunction reads from the Queue, deciding when to emit(), and when to call itself again.
-// QuantizeFunction is run any time `false` is written to readyChannel.
-// Periodicity is achieved when QuantizeFunction itself writes to readyChannel
+// Quantizer reads from the Queue, deciding when to emit(), and when to call itself again.
+// Quantizer is run any time `false` is written to readyChannel.
+// Periodicity is achieved when Quantizer itself writes to readyChannel
 //
-// A value of `false` sent to readyChannel triggers another run of QuantizeFunction.
+// A value of `false` sent to readyChannel triggers another run of Quantizer.
 // A value of `true` triggers emit()
-type QuantizeFunction[NICE any] func([]NICE) bool
+type Quantizer[NICE any] func([]NICE) bool
 
-func (m *stateMachine[NICE]) quantize(fn QuantizeFunction[NICE]) {
+func (m *rebounceMachine[NICE]) quantize(fn Quantizer[NICE]) {
 	go func() {
 		readyToEmit := fn(m.readQueue())
 		if readyToEmit {

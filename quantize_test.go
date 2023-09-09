@@ -1,32 +1,32 @@
-package rebouncer_test
+package rebouncer
 
 import (
+	"fmt"
 	"time"
-
-	"github.com/sean9999/rebouncer"
 )
 
-func ExampleQuantizeFunction() {
+type fsEvent struct {
+	File          string
+	Operation     string
+	TransactionId uint64
+}
 
-	type fsEvent struct {
-		File          string
-		Operation     string
-		TransactionId uint64
+func ExampleQuantizer() {
+
+	// type Quantizer[NICE any] func([]NICE) bool
+
+	quantFunc := func(queue []fsEvent) bool {
+
+		//	one second between runs
+		time.Sleep(time.Second)
+
+		//	return true if there is anything at all in the queue
+		ok2flush := (len(queue) > 0)
+		return ok2flush
+
 	}
 
-	type MyNiceEvent rebouncer.NiceEvent[fsEvent]
-
-	//	since QuantizeFunction is a closure, it can access its outer scope
-	interval, _ := time.ParseDuration("1s")
-
-	//	QuantizeFunction[fsEvent]
-	_ = func(readyChan chan<- bool, queue []MyNiceEvent) {
-		if len(queue) > 0 {
-			readyChan <- true
-		} else {
-			time.Sleep(interval)
-			readyChan <- false
-		}
-	}
+	fmt.Println(quantFunc([]fsEvent{}))
+	// Output: false
 
 }

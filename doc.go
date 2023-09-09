@@ -2,50 +2,32 @@
 Package rebouncer is a generic library that takes a noisy source of events
 and produces a calmer, fitter, and happier source.
 
-It employs a plugin architecture that can allow it to be used flexibly.
+It has a well-defined set of lifecycle events that the user hooks into to get desired functionality.
 
-The canonical case is a file-watcher that discards events involving temp files and other artefacts,
-providing it's consumer with a clean, sane, and curated (not drinking too much) source of events.
-This is useful with IDEs that tend to produce a lot of temp files or perform several operations on a file in quick succession.
-
-Example code will use that case.
-
-Rebouncer can be thought of as a state machine with well-defined lifecycle hooks
-into which user-defined functions are injected.
-It's design facilitates a healthy boundary between general mechanics and business logic.
-It makes liberal use of channels and go routines.
+The canonical example is a file-watcher that discards events involving temp files that IDEs might create. A file-watcher will also typically want a "rebounce" feature that prevents premature firing. Rebouncer provides a generic framework that can solve these problems by allowing the user to inject three types of user-defined functions: [Ingester], [Reducer], and [Quantizer].
 
 # Components
 
 These architectural components are involved in making Rebouncer work:
 
-  - The [NiceEvent] is the atomic unit. Most of the data flow through Rebouncer is with NiceEvents. It wraps the original event (the noisy one) with a little metadata to help things along.
-  - Queue is a buffer of NiceEvents, waiting to be flushed (emitted) to the consumer
-  - A readyChannel which is used to indicate when an emit() is appropriate
-  - NiceEvents are transferred from the Queue to a channel called outgoingEvents. This is what the consumer listens on.
-  - A mutex to prevent loss of data through concurrency
+  - The Event is the atomic unit. It is a user-defined type. It is whatever you need it to be for your use case.
+  - The [Ingester] produces events. When it's work is done, Rebouncer enters the [Draining] lifecycle state.
+  - The [Reducer] is run every time after [Ingester] pushes an event to the [Queue]. It operates on all records in the queue and modifies the queue in its totality.
+  - The [Queue] is a memory-safe slice of Events, waiting to be flushed to the consumer
+  - The [Quantizer] runs at intervals of its choosing, deciding whether or not to flush to the consumer. It and [Reducer] take turns locking the [Queue], ensuring safety.
 
-The struct (machine) that implements [Behaviour] has no exported fields.
-Behaviour has only one: [Behaviour.Subscribe] which is a channel of NiceEvents that Rebouncer's consumer listens on.
+These mechanical components exist to enable the above:
 
-# User-defined Functions
+  - an incomingEvents channel of type Event
+  - a lifeCycle channel to keep track of lifecycle state.
+  - a mutex lock to enable memory-safe operations against the [Queue].
 
-The general characteristics of user-defined functions in Rebouncer are:
- 1. They only have access to the data they need (read-only when appropriate)
- 2. Through the power of closures they can access scope that Rebouncer itself cannot
- 3. They contain all business-logic necessary for the use-case.
- 4. They are triggered by Rebouncer at appropriate times.
+# Behaviour
 
-User-defined functions are passed in at instantiation-time.
+When [Ingester] completes, Rebouncer enters the [Draining] state.
 
-The three types of user-defined functions are [IngestFunction], [ReduceFunction], and [QuantizeFunction], corresponding to lifecycle events.
+You can receive events with [rebouncer.Subscribe], which returns a channel.
 
-# Lifecycle Events
-
-  - Ingest. Dirty events are transformed into NiceEvents and pushed to the Queue. An [IngestFunction] continually pumps data in.
-  - Reduce. Operates on the entire Queue and replaces it wholesale. [ReduceFunction] runs any time the Queue is added to by [IngestFunction]
-  - Quantize. Runs whenever it feels it's necessary, and decides to emit(), or not.
-  - Egest. This is effectively just emit(), but it's important that a distinction be made between
-    the act of emitting and the corresponding lifecycle event, so we can reason about data loss.
+You can trigger the [Draining] state with [rebouncer.Interrupt].
 */
 package rebouncer

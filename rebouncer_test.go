@@ -1,4 +1,4 @@
-package rebouncer_test
+package rebouncer // import rebouncer
 
 import (
 	"fmt"
@@ -7,7 +7,8 @@ import (
 
 	frenchDeck "github.com/sean9999/GoCards/deck/french"
 	"github.com/sean9999/GoCards/game/easypoker"
-	"github.com/sean9999/rebouncer"
+
+	"time"
 )
 
 func TestNewRebouncer(t *testing.T) {
@@ -70,18 +71,12 @@ func TestNewRebouncer(t *testing.T) {
 		return okToEmit
 	}
 
-	//	emit doesn't need to do anything special
-	passThrough := func(e pokerInfo) pokerInfo {
-		return e
-	}
-
 	t.Run("create a rebouncer with three structs and no user-defined functions", func(t *testing.T) {
 
-		rebecca := rebouncer.NewRebouncer[pokerInfo](
+		rebecca := NewRebouncer[pokerInfo](
 			ingestCards,
 			removeLowHands,
 			pushItRealGood,
-			passThrough,
 			1024,
 		)
 
@@ -90,5 +85,88 @@ func TestNewRebouncer(t *testing.T) {
 		}
 
 	})
+
+}
+
+type PokerInfo struct {
+	RowId int
+	Cards easypoker.Cards
+	Hand  easypoker.PokerHand
+}
+
+func (pi PokerInfo) String() string {
+	return fmt.Sprintf("row:\t%d\nhand:\t%s\t(%s)\n", pi.RowId, pi.Cards.Strand(), pi.Hand.Grade)
+}
+
+func ExampleRebouncer() {
+
+	//	This example ingests a source of randomly shuffled cards,
+	//	excludes the jokers,
+	//	batches them into hands of 5,
+	//	and emits those hands which beat 🂷🃇🂧🃞🂣 (three sevens).
+
+	//	Consume a stream of cards. Reject jokers. Make piles of 5. Send them to incomingEvents
+	ingestFunc := func(incoming chan<- PokerInfo) {
+
+		done := make(chan bool)
+		randy := rand.NewSource(time.Now().UnixNano())
+		cardsChan := frenchDeck.StreamCards(randy, done)
+
+		piles := make(chan easypoker.Card, 5)
+		i := 0
+		for card := range cardsChan {
+			i++
+			goodCard, err := easypoker.CardFromFrench(card)
+			if err == nil {
+				piles <- goodCard
+				if len(piles) == 5 {
+					fiveCards := []easypoker.Card{
+						<-piles, <-piles, <-piles, <-piles, <-piles,
+					}
+					pi := PokerInfo{
+						RowId: i,
+						Cards: fiveCards,
+					}
+					incoming <- pi
+					if i > 10_000 {
+						done <- true // signal to StreamCards
+					}
+				}
+			}
+		}
+	}
+
+	//	reducer. Omit any hand that doesn't beat 3 sevens
+	reduceFunc := func(oldcards []PokerInfo) []PokerInfo {
+		goodHands := make([]PokerInfo, 0, len(oldcards))
+		lowHand, _ := easypoker.HandFromString("🂷🃇🂧🃞🂣")
+		for _, thisHand := range oldcards {
+			if thisHand.Cards.Beats(lowHand) {
+				thisHand.Hand = easypoker.HighestPokerHand(thisHand.Cards)
+				goodHands = append(goodHands, thisHand)
+			}
+		}
+		return goodHands
+	}
+
+	//	quantize. Wait before flushing
+	quantizeFunc := func(stuff []PokerInfo) bool {
+		time.Sleep(time.Millisecond * 100)
+		return (len(stuff) > 0)
+	}
+
+	//	invoke rebouncer
+	streamOfPokerHands := NewRebouncer[PokerInfo](
+		ingestFunc,
+		reduceFunc,
+		quantizeFunc,
+		1024,
+	)
+
+	//	subscribe to rebouncer's OutgoingEvents channel
+	for pokerHand := range streamOfPokerHands.Subscribe() {
+		fmt.Println(pokerHand)
+		fmt.Println("------------------")
+	}
 
 }
