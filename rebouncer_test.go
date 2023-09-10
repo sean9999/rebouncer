@@ -25,8 +25,8 @@ func TestNewRebouncer(t *testing.T) {
 	// eat up random cards from a random-card source
 	// group them into hands of five and push those hands to the queue
 	ingestCards := func(q chan<- pokerInfo) {
-		done := make(chan bool)
-		cardsChan := frenchDeck.StreamCards(randy, done)
+		//done := make(chan bool)
+		cardsChan, done := frenchDeck.StreamCards(randy)
 		cardsBuffer := make([]easypoker.Card, 0, 5)
 		n := int64(0)
 		for c := range cardsChan {
@@ -108,9 +108,9 @@ func ExampleRebouncer() {
 	//	Consume a stream of cards. Reject jokers. Make piles of 5. Send them to incomingEvents
 	ingestFunc := func(incoming chan<- PokerInfo) {
 
-		done := make(chan bool)
+		//done := make(chan bool)
 		randy := rand.NewSource(time.Now().UnixNano())
-		cardsChan := frenchDeck.StreamCards(randy, done)
+		cardsChan, done := frenchDeck.StreamCards(randy)
 
 		piles := make(chan easypoker.Card, 5)
 		i := 0

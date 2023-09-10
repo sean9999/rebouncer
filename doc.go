@@ -10,7 +10,7 @@ The canonical example is a file-watcher that discards events involving temp file
 
 These architectural components are involved in making Rebouncer work:
 
-  - The Event is the atomic unit. It is a user-defined type. It is whatever you need it to be for your use case.
+  - The NiceEvent is the atomic unit. It is a user-defined type. It is whatever you need it to be for your use case.
   - The [Ingester] produces events. When it's work is done, Rebouncer enters the [Draining] lifecycle state.
   - The [Reducer] is run every time after [Ingester] pushes an event to the [Queue]. It operates on all records in the queue and modifies the queue in its totality.
   - The [Queue] is a memory-safe slice of Events, waiting to be flushed to the consumer

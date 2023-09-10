@@ -31,6 +31,7 @@ func NewRebouncer[NICE any](
 		incomingEvents: make(chan NICE, bufferSize),
 		outgoingEvents: make(chan NICE),
 		lifeCycle:      make(chan lifeCycleState, 1),
+		queue:          make([]NICE, 0, bufferSize),
 	}
 
 	m.SetLifeCycleState(Running)
