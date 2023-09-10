@@ -1,99 +1,113 @@
 # Rebouncer
 
-[![Conventional Commits](https://img.shields.io/badge/Conventional%20Commits-1.0.0-%23FE5196?logo=conventionalcommits&logoColor=white)](https://conventionalcommits.org)
-
-[![Maintenance](https://img.shields.io/badge/Maintained%3F-yes-green.svg)](https://github.com/sean9999/rebouncer/graphs/commit-activity)
-
-[![Go Reference](https://pkg.go.dev/badge/github.com/sean9999/rebouncer.svg)](https://pkg.go.dev/github.com/sean9999/rebouncer)
-
-[![Go Report Card](https://goreportcard.com/badge/github.com/sean9999/rebouncer)](https://goreportcard.com/report/github.com/sean9999/rebouncer)
-
-[![Go version](https://img.shields.io/github/go-mod/go-version/sean9999/rebouncer.svg)](https://github.com/sean9999/rebouncer)
-
 ## A Powerful Debouncer for your Conjuring Needs
 
-![Hand of Fish](/docs/hand.jpg)
+<div class="evenly-spread">
 
-Rebouncer is a generic library that takes a noisy source of events, and produces a cleaner source.
+[![Maintenance](https://img.shields.io/badge/Maintained%3F-yes-green.svg)](https://github.com/sean9999/rebouncer/graphs/commit-activity) 
+[![Go Report Card](https://goreportcard.com/badge/github.com/sean9999/rebouncer)](https://goreportcard.com/report/github.com/sean9999/rebouncer)
+[![Go version](https://img.shields.io/github/go-mod/go-version/sean9999/rebouncer.svg)](https://github.com/sean9999/rebouncer)
+[![Go Reference](https://pkg.go.dev/badge/github.com/sean9999/rebouncer.svg)](https://pkg.go.dev/github.com/sean9999/rebouncer)
 
-It employes a plugin architecture that can allow it to be used flexibly whenever the fan-out/fan-in concurrency pattern is needed.
+<div>
 
-The canonical case is a file-watcher that discards events involving temp files and other artefacts, providing its consumer with a clean, sane, and curated source of events. It is the engine behind [Fasthak](https://www.seanmacdonald.ca/posts/fasthak/).
+<img src="/docs/hand.jpg" width="350" />
 
-For the canonical case, rebouncer is also available as a binary. It takes a directory as an argument, producing SSE events to stdout.
+Rebouncer is a package that takes a noisy source of events and produces a cleaner, fitter, happier (not drinking too much) source. It is useful in scenarios where you want debounce-like functionality, and full control over how events are consumed, filtered, queued and flushed to the consuming process.
 
-## Using it as a binary
+## Concepts
 
-This simplest case is accomplished like so:
+### The NICE Event
 
-```sh
-$ go install github.com/sean9999/rebouncer/cmd
-$ rebouncer -dir ~/projects/myapp/build
-```
-
-Which might stream to stdout something that looks like this:
-
-<pre>
-<samp>event: rebouncer/fs/output
-data: {"file": "index.html", "operation": "modify"}
-
-event: rebouncer/fs/output
-data: {"file": "css/debug.css", "operation": "delete"}
-
-event: rebouncer/fs/output
-data: {"file": "css/mobile", "operation": "create"}
-
-event: rebouncer/fs/output
-data: {"file": "css/mobile", "operation": "modify"}</samp>
-</pre>
-
-## Using it as a library
-
-You may want more flexibility than that. Rebouncer can be invoked as a library, allowing you to embed it in your application and giving you fine-grained control.
-
-Rebouncer needs a few basic to be passed in. Continuing the example a file-watcher, let's go over the basic architecture of these plugin lifecycle functions:
-
-### Injestor
-
-An injestor is defined as runs in a go routine, and sends events of interest to Rebouncer, pushing them onto the Queue. It looks like this:
-
-### Reducer
-
-Reducer operates on the entire Queue, each time Injestor runs, modifiying, removing, or even adding events as needed.
-
-### Quantizer
-
-Runs in a go routine, keeping tabs on the Queue and telling Rebouncer when it's ready for a Flush().
-
-The simplest case for use in a library is, again, the canonical case of a file-watcher, for which there is a convenience function:
+NiceEvent is simply the type of event you pass in to Rebouncer. It exists only as a concept so we can have something to refer to:
 
 ```go
-package main
+type Rebouncer[NICE any] interface {
+	Subscribe() <-chan NICE 	// the channel a consumer can subsribe to
+	emit()                  	// flushes the Queue
+	readQueue() []NICE      	// gets the Queue, with safety and locking
+	writeQueue([]NICE)      	// sets the Queue, handling safety and locking
+	ingest(Ingester[NICE])
+	quantize(Quantizer[NICE])   // decides whether the flush the Queue
+	reduce(Reducer[NICE], NICE) // removes unwanted NiceEvents from the Queue
+	Interrupt()                 //	call this to initiate the "Draining" state
+}
 
-import (
-	"fmt"
-	"github.com/sean9999/rebouncer"
-)
+type myType struct {
+	...
+}
 
-//	watch ./build and emit every 1000 milliseconds
-stateMachine := rebouncer.NewInotify("./build", 1000)
+bufferSize = 1024 // how much buffer space do we want for incoming events?
 
-for niceEvent := range stateMachine.Subscribe() {
-	fmt.Println(niceEvent.Dump())
+//	myRebouncer is a Rebouncer of type myType
+myRebouncer := rebouncer.NewRebouncer[myType](ingest, reduce, quantize, bufferSize)
+```
+
+Rebouncer has two run-loops:
+
+### Ingest ☞ Reduce
+
+The Ingestor runs in it's own loop, pushing events to a channel in Rebouncer. Every time an event is pushed, Reducer runs. Reducer operates on the entire queue of events, filtering out unwanted events or modifying to taste. Here are the definitions of these functions. NICE is a type parameter. Internally, your custom event type is known as a "Nice Event".
+
+```go
+type Ingester[NICE any] func(chan<- NICE)
+type Reducer[NICE any] func([]NICE) []NICE
+```
+
+### Quantize ☞ Emit
+
+Quantizer returns true or false. True when we want to flush the queue to the consumer, and False when we don't. As soon as Quantizer is returned, it's run again. So to throttle it, do `time.Sleep()`.
+
+When the program enters the Draining state, it shuts down after the last Emit(). Otherwise it keeps looping.
+
+```go
+type Quantizer[NICE any] func([]NICE) bool
+```
+
+Ensure that your Ingestor, Reducer, and Quantizer all operate on the same type:
+
+```go
+//	Example
+
+type myEvent struct {
+	id int
+	name string
+	timestamp time.Time
+}
+
+//	ingest events
+ingest := func(incoming<- myEvent) {
+	for ev := range mySourceOfEvents() {
+		incoming<-ev
+	} 
+}
+
+//	we're not interested in any event involving .DS_Store
+reduce := func(inEvents []myEvent) []myEvent {
+	outEvents := []myEvent{}
+	for ev := range inEvents {
+		if ev.name != ".DS_Store" {
+			outEvents = append(outEvents, ev)
+		}
+	}
+	return outEvents
+}
+
+//	flush the queue every second
+quantize := func(queue []myEvent) bool {
+	time.Sleep(time.Second)
+	if len(queue) > 0 {
+		return true
+	} else {
+		return false
+	}
+}
+
+re := rebouncer.NewRebouncer[myEvent](ingest, reduce, quantize, 1024)
+
+for ev := range re.Subscribe() {
+	fmt.Println(ev)
 }
 ```
 
-Calling `rebouncer.NewInotify()` in this way is the equivilant of:
 
-```go
-//	rebecca is our singleton instance
-stateMachine := rebouncer.New(rebouncer.Config{
-	BufferSize: rebouncer.DefaultBufferSize,
-	Quantizer:  rebouncer.DefaultInotifyQuantizer(1000),
-	Reducer:    rebouncer.DefaultInotifyReduce,
-	Injestor:   rebouncer.DefaultInotifyInjestor("./build", rebouncer.DefaultBufferSize),
-})
-
-```
-
-`DefaultInotifyQuantizer()`, `DefaultInotifyReduce()`, and `DefaultInotifyInjestor()` are all themselves convenience functions that alleviate you from having to write your own respective Quantizer, Reducer, and Injestor.

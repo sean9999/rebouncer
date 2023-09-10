@@ -1,26 +1,33 @@
 /*
-Rebouncer is a generic library takes a noisy source of events, and produces a cleaner source.
+Package rebouncer is a generic library that takes a noisy source of events
+and produces a calmer, fitter, and happier source.
 
-It employs a plugin architecture that can allow it to be used flexibly whenever the fan-out-fan-in concurrency pattern is needed.
+It has a well-defined set of lifecycle events that the user hooks into to get desired functionality.
 
-The canonical case is a file-watcher that discards events involving temp files and other artefacts, providing it's consumer with a clean, sane, and curated source of events.
+The canonical example is a file-watcher that discards events involving temp files that IDEs might create. A file-watcher will also typically want a "rebounce" feature that prevents premature firing. Rebouncer provides a generic framework that can solve these problems by allowing the user to inject three types of user-defined functions: [Ingester], [Reducer], and [Quantizer].
 
-For that case, rebouncer is also available as a binary, which takes a directory as an argument, producing SSE events to stdout.
+# Components
 
-To use the binary as a file-watcher:
+These architectural components are involved in making Rebouncer work:
 
-	$ rebouncer -dir ./some/dir
+  - The NiceEvent is the atomic unit. It is a user-defined type. It is whatever you need it to be for your use case.
+  - The [Ingester] produces events. When it's work is done, Rebouncer enters the [Draining] lifecycle state.
+  - The [Reducer] is run every time after [Ingester] pushes an event to the [Queue]. It operates on all records in the queue and modifies the queue in its totality.
+  - The [Queue] is a memory-safe slice of Events, waiting to be flushed to the consumer
+  - The [Quantizer] runs at intervals of its choosing, deciding whether or not to flush to the consumer. It and [Reducer] take turns locking the [Queue], ensuring safety.
 
-To use it as a library, but again employing it as an inotify-backed filewatcher:
+These mechanical components exist to enable the above:
 
-	stateMachine := rebouncer.NewInotify("./build", 1000)
-	niceChannel := stateMachine.Subscribe()
+  - an incomingEvents channel of type Event
+  - a lifeCycle channel to keep track of lifecycle state.
+  - a mutex lock to enable memory-safe operations against the [Queue].
 
-Although Rebouncer provides convenience functions for common cases (such as file-watcher using inotify), an understanding of its basic architecture is necessary for more advanced uses.
+# Behaviour
 
-  - an [Injestor] injests your source events, converting them into a format rebouncer can reason about, adding them to the queue
-  - a [Reducer] operates on the entire queue of events, discarding, modifying, or even adding new ones at will
-  - a [Quantizer] is initialized at startup and runs directly after the reducer, deciding where it's time to Emit()
-  - an [Egestor] that formats the output. It is simply a function that takes a [NiceEvent] and returns an AnyEvent
+When [Ingester] completes, Rebouncer enters the [Draining] state.
+
+You can receive events with [rebouncer.Subscribe], which returns a channel.
+
+You can trigger the [Draining] state with [rebouncer.Interrupt].
 */
 package rebouncer
