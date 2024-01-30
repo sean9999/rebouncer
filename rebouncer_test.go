@@ -20,12 +20,11 @@ func TestNewRebouncer(t *testing.T) {
 		N         int64
 	}
 
-	randy := rand.NewSource(0)
-
-	// eat up random cards from a random-card source
-	// group them into hands of five and push those hands to the queue
+	//	ingestCards is an [Ingester].
+	//	It eats up random cards from a random card source,
+	//	and marshals then in a [pokerInfo] by grouping them into hands of 5 and evaluating as a poker hand.
 	ingestCards := func(q chan<- pokerInfo) {
-		//done := make(chan bool)
+		randy := rand.NewSource(0)
 		cardsChan, done := frenchDeck.StreamCards(randy)
 		cardsBuffer := make([]easypoker.Card, 0, 5)
 		n := int64(0)
@@ -51,7 +50,8 @@ func TestNewRebouncer(t *testing.T) {
 		}
 	}
 
-	//	we're not interested in low hands
+	//	removeLowHands is a [Reducer].
+	//	It removes low hands.
 	removeLowHands := func(queue []pokerInfo) []pokerInfo {
 		newQueue := make([]pokerInfo, 0, len(queue))
 		for _, hand := range queue {
@@ -62,10 +62,9 @@ func TestNewRebouncer(t *testing.T) {
 		return newQueue
 	}
 
-	//	quantizer is dead simple here:
-	//	if there's anything in the queue,
-	//	push it out
-	// type QuantizeFunction[NICE any] func(chan<- bool, Queue[NICE])
+	//	pushItRealGood is a [Quantizer].
+	//	It simply flushes the queue if there is anything to flush.
+	//	The absense of time.Sleep() or any blocking operation indicates it does no throttling.
 	pushItRealGood := func(queue []pokerInfo) bool {
 		okToEmit := (len(queue) > 0)
 		return okToEmit
@@ -108,8 +107,7 @@ func ExampleRebouncer() {
 	//	Consume a stream of cards. Reject jokers. Make piles of 5. Send them to incomingEvents
 	ingestFunc := func(incoming chan<- PokerInfo) {
 
-		//done := make(chan bool)
-		randy := rand.NewSource(time.Now().UnixNano())
+		randy := rand.NewSource(0)
 		cardsChan, done := frenchDeck.StreamCards(randy)
 
 		piles := make(chan easypoker.Card, 5)
